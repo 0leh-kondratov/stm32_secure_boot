@@ -1,0 +1,33 @@
+# Build outputs
+build/
+build_app/
+*.o
+*.elf
+*.bin
+*.map
+*.d
+
+# Python
+scripts/venv/
+__pycache__/
+*.py[cod]
+.Python
+*.egg-info/
+.eggs/
+
+# Private keys (do not commit)
+scripts/root_private_key.pem
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Optional: uncomment if you add mbedTLS as submodule or copy
+# third_party/mbedtls/

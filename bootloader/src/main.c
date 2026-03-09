@@ -7,6 +7,7 @@
 #include "image_header.h"
 #include "keys.h"
 #include "memory_map.h"
+#include "uart_log.h"
 
 #ifdef USE_ECDSA_STUB
 /* Stub: no mbedTLS, signature always accepted. Use for first flash test only. */
@@ -86,29 +87,38 @@ bool verify_signature(void)
     const image_header_t *hdr = (const image_header_t *) IMAGE_HEADER_ADDRESS;
     uint8_t hash[32];
 
-    // Basic validation of image header
+    log_puts("Verify: header...\r\n");
+
     if (hdr->magic != IMAGE_HEADER_MAGIC) {
+        log_puts("  FAIL: bad magic\r\n");
         return false;
     }
+    log_puts("  magic OK\r\n");
 
     if (hdr->image_size == 0U) {
+        log_puts("  FAIL: image_size=0\r\n");
         return false;
     }
+    log_puts("  size OK\r\n");
 
-    // Compute SHA-256 of application region using hardware HASH
+    log_puts("  SHA256...\r\n");
     if (hw_sha256_app_region(APP_START_ADDRESS,
                              hdr->image_size,
                              hash) != 0) {
+        log_puts("  FAIL: SHA256\r\n");
         return false;
     }
+    log_puts("  SHA256 OK\r\n");
 
-    // Verify ECDSA P-256 signature over the hash using root_public_key
+    log_puts("  ECDSA verify...\r\n");
     if (ecdsa_verify_p256_sha256(hash,
                                  hdr->signature,
                                  (uint32_t)sizeof(hdr->signature),
                                  root_public_key) != 0) {
+        log_puts("  FAIL: ECDSA\r\n");
         return false;
     }
+    log_puts("  ECDSA OK\r\n");
 
     return true;
 }
@@ -333,10 +343,17 @@ int main(void)
 {
     const image_header_t *hdr = (const image_header_t *)IMAGE_HEADER_ADDRESS;
 
+    log_init();
+    log_puts("[boot] Secure bootloader\r\n");
+    log_puts("[boot] UART 115200 OK\r\n");
+
     if (!verify_signature()) {
+        log_puts("[boot] Signature FAIL, halt\r\n");
         signal_verification_failure();
     }
 
+    log_puts("[boot] Signature OK\r\n");
+    log_puts("[boot] Jump to app\r\n");
     jump_to_application(hdr->entry_point);
 
     return 0;

@@ -6,6 +6,7 @@
  * prepends image_header_t and writes the combined image to flash at 0x08010000.
  */
 #include <stdint.h>
+#include "uart_log.h"
 
 #define RCC_BASE            (0x58024400UL)
 #define RCC_AHB4ENR         (*(volatile uint32_t *)(RCC_BASE + 0xE0U))
@@ -27,6 +28,9 @@ static void delay(uint32_t count)
 
 int main(void)
 {
+    log_init();
+    log_puts("App started\r\n");
+
     RCC_AHB4ENR |= RCC_AHB4ENR_GPIOBEN;
     GPIOB_MODER &= ~(3U << (LED1_PIN * 2U));
     GPIOB_MODER |= (1U << (LED1_PIN * 2U));

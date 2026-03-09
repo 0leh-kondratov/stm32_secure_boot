@@ -1,6 +1,5 @@
-# Step 1: Hardware Baseline — I2C1 (PB8/PB9) + LCD 1602. No FreeRTOS.
-# Run from project root: make step1   → build/step1/step1.bin
-# If UART shows nothing, try: make step1 UART_9600=1  and open terminal at 9600 8N1.
+# Step 1 minimal: только UART. Без I2C, без LCD.
+# make step1 → build/step1/step1.bin. UART: USART2 (ST-Link VCP), 115200 8N1.
 TOP      ?= $(CURDIR)
 CUBE_ROOT ?= $(abspath $(TOP)/../STM32CubeH7)
 
@@ -11,9 +10,7 @@ AS       = arm-none-eabi-gcc -x assembler-with-cpp
 
 CFLAGS   = -mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=c11 -Wall -O2
 CFLAGS  += -DSTM32H743xx -DUSE_HAL_DRIVER -DUSE_PWR_LDO_SUPPLY
-ifdef UART_9600
-CFLAGS  += -DSTEP1_UART_9600
-endif
+CFLAGS  += -DUART_LOG_USE_USART2
 CFLAGS  += -I$(TOP)/common
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/CMSIS/Include
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/CMSIS/Device/ST/STM32H7xx/Include
@@ -29,9 +26,9 @@ STARTUP  = $(TOP)/app/startup_stm32h743xx.s
 CMSIS_DEVICE = $(CUBE_ROOT)/Drivers/CMSIS/Device/ST/STM32H7xx
 SYSTEM   = $(CMSIS_DEVICE)/Source/Templates/system_stm32h7xx.c
 
-OBJ = $(BUILD)/main.o $(BUILD)/uart_log.o $(BUILD)/lcd_1602_i2c.o $(BUILD)/startup.o $(BUILD)/system_stm32h7xx.o \
-      $(BUILD)/hal_cortex.o $(BUILD)/hal_gpio.o $(BUILD)/hal_rcc.o $(BUILD)/hal_i2c.o $(BUILD)/hal_i2c_ex.o $(BUILD)/hal_dma.o \
-      $(BUILD)/hal.o $(BUILD)/hal_pwr.o
+OBJ = $(BUILD)/main.o $(BUILD)/uart_log.o $(BUILD)/startup.o $(BUILD)/system_stm32h7xx.o \
+      $(BUILD)/hal_cortex.o $(BUILD)/hal_gpio.o $(BUILD)/hal_rcc.o $(BUILD)/hal_rcc_ex.o \
+      $(BUILD)/hal_uart.o $(BUILD)/hal_uart_ex.o $(BUILD)/hal_dma.o $(BUILD)/hal.o $(BUILD)/hal_pwr.o
 
 all: $(BUILD)/step1.elf $(BUILD)/step1.bin
 
@@ -42,8 +39,6 @@ $(BUILD)/main.o: $(TOP)/app/step1/main.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/uart_log.o: $(TOP)/common/uart_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
-$(BUILD)/lcd_1602_i2c.o: $(TOP)/common/lcd_1602_i2c.c | $(BUILD)
-	$(CC) $(CFLAGS) -DUSE_HAL_DRIVER -c -o $@ $<
 $(BUILD)/startup.o: $(STARTUP) | $(BUILD)
 	$(AS) $(CFLAGS) -c -o $@ $<
 $(BUILD)/system_stm32h7xx.o: $(SYSTEM) | $(BUILD)
@@ -59,9 +54,11 @@ $(BUILD)/hal_rcc.o: $(HAL_SRC)/stm32h7xx_hal_rcc.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/hal_pwr.o: $(HAL_SRC)/stm32h7xx_hal_pwr.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
-$(BUILD)/hal_i2c.o: $(HAL_SRC)/stm32h7xx_hal_i2c.c | $(BUILD)
+$(BUILD)/hal_uart.o: $(HAL_SRC)/stm32h7xx_hal_uart.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
-$(BUILD)/hal_i2c_ex.o: $(HAL_SRC)/stm32h7xx_hal_i2c_ex.c | $(BUILD)
+$(BUILD)/hal_uart_ex.o: $(HAL_SRC)/stm32h7xx_hal_uart_ex.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/hal_rcc_ex.o: $(HAL_SRC)/stm32h7xx_hal_rcc_ex.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/hal_dma.o: $(HAL_SRC)/stm32h7xx_hal_dma.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<

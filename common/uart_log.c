@@ -1,176 +1,156 @@
-/*
- * UART log: 115200 8N1 for ST-Link VCP on NUCLEO-144.
- * Use USART2 (PA2=TX, PA3=RX) — typical for ST-Link VCP on many Nucleo boards.
- * If no output, try building with -DUART_LOG_USE_USART3 for PD8/PD9.
+/**
+ * @file uart_log.c
+ * @brief Robust UART logging for NUCLEO-H743ZI2 — USART3 (PD8 TX, PD9 RX), 115200 8N1.
+ *
+ * When USE_HAL_DRIVER is defined: uses HAL in blocking mode (HAL_UART_Transmit).
+ * For accurate baud at 400 MHz SYSCLK, call log_init() after SystemClock_Config().
+ * On STM32H743, USART3 is clocked by D2PCLK1 (APB1).
  */
 #include <stdint.h>
+#include <string.h>
 #include "uart_log.h"
-#ifdef UART_LOG_FREERTOS_YIELD
-#include "FreeRTOS.h"
-#include "task.h"
-#endif
 
 #ifdef USE_HAL_DRIVER
 #include "stm32h7xx_hal.h"
 #endif
 
-#define RCC_BASE            (0x58024400UL)
-#define RCC_AHB4ENR         (*(volatile uint32_t *)(RCC_BASE + 0xE0U))
-#define RCC_APB1LENR        (*(volatile uint32_t *)(RCC_BASE + 0x58U))
-#define RCC_D2CFGR          (*(volatile uint32_t *)(RCC_BASE + 0x94U))
-#define RCC_D2CCIP2R        (*(volatile uint32_t *)(RCC_BASE + 0x54U))
+#define LOG_UART_TIMEOUT_MS  1000U
 
-#define USART_CR1_UE        (1U << 0)
-#define USART_CR1_TE        (1U << 3)
-#define USART_CR1_RE        (1U << 2)
-#define USART_ISR_TXE       (1U << 7)
-#define USART_ISR_RXNE      (1U << 5)
+#ifdef USE_HAL_DRIVER
 
-#if defined(UART_LOG_USE_USART3)
-/* USART3, PD8 (TX), PD9 (RX) */
-#define RCC_AHB4ENR_GPIOXEN (1U << 3)
-#define GPIOX_BASE          (0x58020C00UL)
-#define GPIOX_MODER         (*(volatile uint32_t *)(GPIOX_BASE + 0x00U))
-#define GPIOX_AFR1          (*(volatile uint32_t *)(GPIOX_BASE + 0x24U))
-#define RCC_APB1LENR_UARTEN (1U << 18)
-#define UART_BASE           (0x40004800UL)
-#define MODER_MASK          ((3U << (8*2)) | (3U << (9*2)))
-#define MODER_ALT           ((2U << (8*2)) | (2U << (9*2)))
-#define AFR_MASK            (0xFFU)
-#define AFR_VAL             (0x77U)  /* AF7 for PD8 and PD9 */
-#else
-/* USART2, PA2 (TX), PA3 (RX) */
-#define RCC_AHB4ENR_GPIOXEN (1U << 0)
-#define GPIOX_BASE          (0x58020000UL)
-#define GPIOX_MODER         (*(volatile uint32_t *)(GPIOX_BASE + 0x00U))
-#define GPIOX_AFRL          (*(volatile uint32_t *)(GPIOX_BASE + 0x20U))
-#define RCC_APB1LENR_UARTEN (1U << 17)
-#define UART_BASE           (0x40004400UL)
-#define MODER_MASK          ((3U << (2*2)) | (3U << (3*2)))
-#define MODER_ALT           ((2U << (2*2)) | (2U << (3*2)))
-#define AFR_MASK            (0xFF00U)   /* bits 8-15 for PA2, PA3 */
-#define AFR_VAL             (0x7700U)   /* AF7 for PA2 and PA3 */
-#endif
-
-#define UART_CR1            (*(volatile uint32_t *)(UART_BASE + 0x00U))
-#define UART_BRR            (*(volatile uint32_t *)(UART_BASE + 0x0CU))
-#define UART_ISR            (*(volatile uint32_t *)(UART_BASE + 0x1CU))
-#define UART_TDR            (*(volatile uint32_t *)(UART_BASE + 0x28U))
-#define UART_RDR            (*(volatile uint32_t *)(UART_BASE + 0x24U))
-
-static void delay_loop(uint32_t n)
-{
-    while (n--) __asm volatile("nop");
-}
+/* --- HAL: USART2 (PA2/PA3) = ST-Link VCP, or USART3 (PD8/PD9) --- */
+static UART_HandleTypeDef hlog_uart;
 
 void log_init(void)
 {
-#if defined(DEMO_USE_SYSTEM_CLOCK)
-    /* USART2/3 clock source = PCLK1 (0 = PCLK1). Required for correct baud on H7. */
-    RCC_D2CCIP2R &= ~0x07U;
-#endif
-    RCC_AHB4ENR |= RCC_AHB4ENR_GPIOXEN;
-    RCC_APB1LENR |= RCC_APB1LENR_UARTEN;
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    GPIOX_MODER &= ~MODER_MASK;
-    GPIOX_MODER |= MODER_ALT;
-#if defined(UART_LOG_USE_USART3)
-    GPIOX_AFR1 = (GPIOX_AFR1 & ~AFR_MASK) | AFR_VAL;
+#if defined(UART_LOG_USE_USART2)
+  /* USART2: PA2 (TX), PA3 (RX) — подключено к ST-Link VCP на NUCLEO-H743ZI2 */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_USART2_CLK_ENABLE();
+
+  GPIO_InitStruct.Pin       = GPIO_PIN_2 | GPIO_PIN_3;
+  GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull      = GPIO_NOPULL;
+  GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  hlog_uart.Instance = USART2;
 #else
-    GPIOX_AFRL = (GPIOX_AFRL & ~AFR_MASK) | AFR_VAL;
+  /* USART3: PD8 (TX), PD9 (RX) — нужен внешний USB-UART */
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_USART3_CLK_ENABLE();
+
+  GPIO_InitStruct.Pin       = GPIO_PIN_8 | GPIO_PIN_9;
+  GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull      = GPIO_NOPULL;
+  GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  hlog_uart.Instance = USART3;
 #endif
 
-#if defined(STEP1_UART_9600)
-#define UART_DIV_16X  (16U * 9600U)
-#define UART_BRR_FALLBACK_AT_64MHZ (417U)
-#else
-#define UART_DIV_16X  (16U * 115200U)
-#define UART_BRR_FALLBACK_AT_64MHZ (35U)
-#endif
-    uint32_t brr = UART_BRR_FALLBACK_AT_64MHZ;
-#ifdef USE_HAL_DRIVER
-    /* USART2/3 are on APB1. At log_init() PCLK1 may be default (e.g. 64 MHz). */
-    uint32_t pclk1 = HAL_RCC_GetPCLK1Freq();
-    if (pclk1 != 0U) {
-        brr = (pclk1 + (UART_DIV_16X / 2U)) / UART_DIV_16X;
-        if (brr == 0U) brr = 1U;
-    }
-#elif defined(DEMO_USE_SYSTEM_CLOCK) && !defined(DEMO_RENODE_AUTO_CMD)
-    /* Demo/Test with system_stm32h7xx: PCLK1 = SystemD2Clock / D2PPRE1. */
-    extern uint32_t SystemD2Clock;
-    uint32_t d2ppre1 = (RCC_D2CFGR >> 8U) & 7U;
-    if (d2ppre1 > 4U) d2ppre1 = 4U;
-    uint32_t pclk1 = SystemD2Clock >> d2ppre1;
-    if (pclk1 != 0U) {
-        brr = (pclk1 + (UART_DIV_16X / 2U)) / UART_DIV_16X;
-        if (brr == 0U) brr = 1U;
-    }
-#endif
-    UART_BRR = brr;
-    UART_CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE;
+  hlog_uart.Init.BaudRate      = 115200;
+  hlog_uart.Init.WordLength    = UART_WORDLENGTH_8B;
+  hlog_uart.Init.StopBits      = UART_STOPBITS_1;
+  hlog_uart.Init.Parity        = UART_PARITY_NONE;
+  hlog_uart.Init.Mode          = UART_MODE_TX_RX;
+  hlog_uart.Init.HwFlowCtl     = UART_HWCONTROL_NONE;
+  hlog_uart.Init.OverSampling  = UART_OVERSAMPLING_16;
+  hlog_uart.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  hlog_uart.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  hlog_uart.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 
-    /* Short delay so host terminal / USB-VCP is ready after reset */
-    delay_loop(500000U);
+  (void)HAL_UART_Init(&hlog_uart);
+}
 
-    /* Debug: raw static message (no log_puts) to verify UART TX */
-    {
-        const char *raw = "UART init OK\r\n";
-        while (*raw) {
-            uint32_t n = 100000U;
-            while ((UART_ISR & USART_ISR_TXE) == 0 && n) n--;
-            UART_TDR = (uint32_t)(unsigned char)*raw++;
-            delay_loop(1000U);
-        }
-    }
+void log_puts(const char *str)
+{
+  if (str == NULL || hlog_uart.gState != HAL_UART_STATE_READY)
+    return;
+  size_t len = strlen(str);
+  if (len == 0)
+    return;
+  (void)HAL_UART_Transmit(&hlog_uart, (const uint8_t *)str, (uint16_t)len, LOG_UART_TIMEOUT_MS);
 }
 
 int log_getchar(void)
 {
-    if ((UART_ISR & USART_ISR_RXNE) == 0)
-        return -1;
-    return (int)(UART_RDR & 0xFFU);
+  if (__HAL_UART_GET_FLAG(&hlog_uart, UART_FLAG_RXNE) == 0U)
+    return -1;
+  return (int)(uint8_t)(hlog_uart.Instance->RDR & 0xFFU);
 }
 
-/* Таймаут ожидания TXE (циклов), чтобы не зависать в Renode, если эмулятор не сбрасывает TXE */
-#define LOG_PUTS_TX_TIMEOUT  50000
-/* При UART_LOG_FREERTOS_YIELD при таймауте делаем vTaskDelay(1) и повторяем — даём эмулятору время и не блокируем шелл */
-#ifdef UART_LOG_FREERTOS_YIELD
-#define LOG_PUTS_RETRIES    150
+#else
+
+/* --- Non-HAL fallback (e.g. demo without HAL): USART3 PD8/PD9, register access --- */
+#define RCC_AHB4ENR    (*(volatile uint32_t *)(0x58024400U + 0xE0U))
+#define RCC_APB1LENR   (*(volatile uint32_t *)(0x58024400U + 0x58U))
+#define GPIOD_MODER    (*(volatile uint32_t *)(0x58020C00U + 0x00U))
+#define GPIOD_AFR1     (*(volatile uint32_t *)(0x58020C00U + 0x24U))
+#define USART3_BASE    0x40004800U
+#define USART_BRR      (*(volatile uint32_t *)(USART3_BASE + 0x0CU))
+#define USART_CR1      (*(volatile uint32_t *)(USART3_BASE + 0x00U))
+#define USART_ISR      (*(volatile uint32_t *)(USART3_BASE + 0x1CU))
+#define USART_TDR      (*(volatile uint32_t *)(USART3_BASE + 0x28U))
+#define USART_RDR      (*(volatile uint32_t *)(USART3_BASE + 0x24U))
+#define USART_ISR_TXE  (1U << 7)
+#define USART_ISR_RXNE (1U << 5)
+#define USART_CR1_UE   (1U << 0)
+#define USART_CR1_TE   (1U << 3)
+#define USART_CR1_RE   (1U << 2)
+
+static uint32_t log_pclk1(void); /* forward */
+
+void log_init(void)
+{
+  RCC_AHB4ENR |= (1U << 3);   /* GPIOD */
+  RCC_APB1LENR |= (1U << 18); /* USART3 */
+  GPIOD_MODER = (GPIOD_MODER & ~((3U << (8*2)) | (3U << (9*2)))) | ((2U << (8*2)) | (2U << (9*2)));
+  GPIOD_AFR1  = (GPIOD_AFR1 & ~0xFFU) | 0x77U; /* AF7 for PD8, PD9 */
+  uint32_t pclk = log_pclk1();
+  if (pclk == 0U) pclk = 64000000U;
+  USART_BRR = (pclk + (115200U * 8U)) / (115200U * 16U);
+  if (USART_BRR == 0U) USART_BRR = 1U;
+  USART_CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE;
+}
+
+void log_puts(const char *str)
+{
+  if (!str) return;
+  while (*str) {
+    uint32_t n = 100000U;
+    while ((USART_ISR & USART_ISR_TXE) == 0U && n != 0U) n--;
+    if (n == 0U) break;
+    USART_TDR = (uint32_t)(unsigned char)*str++;
+  }
+}
+
+int log_getchar(void)
+{
+  if ((USART_ISR & USART_ISR_RXNE) == 0U)
+    return -1;
+  return (int)(USART_RDR & 0xFFU);
+}
+
+#if defined(DEMO_USE_SYSTEM_CLOCK)
+extern uint32_t SystemD2Clock;
+static uint32_t log_pclk1(void)
+{
+  uint32_t d2ppre1 = (*(volatile uint32_t *)(0x58024400U + 0x94U) >> 8U) & 7U;
+  if (d2ppre1 > 4U) d2ppre1 = 4U;
+  return SystemD2Clock >> d2ppre1;
+}
+#else
+static uint32_t log_pclk1(void) { return 0U; }
 #endif
 
-void log_puts(const char *s)
+#endif /* USE_HAL_DRIVER */
+
+__attribute__((weak)) void log_ip_address(struct netif *netif)
 {
-    if (!s) return;
-#ifdef DEMO_RENODE_AUTO_CMD
-    /* Сборка для Renode: не ждём TXE. vTaskDelay только после старта планировщика, иначе main() зависнет и перебор LED не запустится. */
-    while (*s) {
-        UART_TDR = (uint32_t)(unsigned char)*s++;
-        if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING)
-            vTaskDelay(pdMS_TO_TICKS(1));
-        else {
-            for (volatile int i = 0; i < 8000; i++) (void)i;
-        }
-    }
-    return;
-#endif
-    while (*s) {
-        uint32_t n = LOG_PUTS_TX_TIMEOUT;
-        while ((UART_ISR & USART_ISR_TXE) == 0 && n != 0)
-            n--;
-#ifdef UART_LOG_FREERTOS_YIELD
-        if (n == 0) {
-            unsigned r = LOG_PUTS_RETRIES;
-            while (r != 0 && (UART_ISR & USART_ISR_TXE) == 0) {
-                vTaskDelay(pdMS_TO_TICKS(1));
-                r--;
-            }
-            if (r == 0)
-                break;
-        }
-#else
-        if (n == 0)
-            break; /* не блокируемся навсегда (например в Renode) */
-#endif
-        UART_TDR = (uint32_t)(unsigned char)*s++;
-    }
+  (void)netif;
 }

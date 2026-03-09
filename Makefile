@@ -60,12 +60,6 @@ step1:
 flash-step1: step1
 	st-flash write build/step1/step1.bin 0x08000000
 
-step1_9600:
-	$(MAKE) -f app/step1/Makefile all CUBE_ROOT="$(CUBE_ROOT)" UART_9600=1
-
-flash-step1_9600: step1_9600
-	st-flash write build/step1/step1.bin 0x08000000
-
 # Step 2: FreeRTOS + DisplayTask (LCD counter 1s).
 step2:
 	$(MAKE) -f app/step2/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
@@ -102,4 +96,4 @@ clean-lwip:
 clean-tests:
 	rm -rf build/stage1 build/stage2
 
-.PHONY: all bootloader app signed-app minimal debug demo demo-renode flash-demo demo-official flash-demo-official lwip flash-lwip step1 flash-step1 step1_9600 flash-step1_9600 step2 flash-step2 test-stage1 test-stage2 flash-stage1 flash-stage2 clean clean-demo clean-lwip clean-tests clean-step1 clean-step2
+.PHONY: all bootloader app signed-app minimal debug demo demo-renode flash-demo demo-official flash-demo-official lwip flash-lwip step1 flash-step1 step2 flash-step2 test-stage1 test-stage2 flash-stage1 flash-stage2 clean clean-demo clean-lwip clean-tests clean-step1 clean-step2

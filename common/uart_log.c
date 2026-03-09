@@ -27,6 +27,12 @@ void log_init(void)
 
 #if defined(UART_LOG_USE_USART2)
   /* USART2: PA2 (TX), PA3 (RX) — подключено к ST-Link VCP на NUCLEO-H743ZI2 */
+  /* На H7 обязательно задать источник тактирования USART234578, иначе BRR неверный. */
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART234578;
+  PeriphClkInit.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PCLK1;
+  (void)HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
+
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_USART2_CLK_ENABLE();
 
@@ -39,7 +45,12 @@ void log_init(void)
 
   hlog_uart.Instance = USART2;
 #else
-  /* USART3: PD8 (TX), PD9 (RX) — нужен внешний USB-UART */
+  /* USART3: PD8 (TX), PD9 (RX) — как в demo. На H7 задать источник тактирования. */
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART234578;
+  PeriphClkInit.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PCLK1;
+  (void)HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
+
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_USART3_CLK_ENABLE();
 

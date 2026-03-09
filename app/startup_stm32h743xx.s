@@ -38,17 +38,20 @@ g_pfnVectors:
 Reset_Handler:
     ldr r0, =_estack
     msr msp, r0
-    /* LED2 (PE1) on immediately: active-low so drive low (BSRR reset bit) */
+    /* H7: power supply and clock init (required before .data/.bss and main) */
+    bl ExitRun0Mode
+    bl SystemInit
+    /* LED1 (PB0) on: enable GPIOB, set PB0 output low (active-low) */
     ldr r0, =0x58024400
     ldr r1, [r0, #0xE0]
-    orr r1, r1, #(1 << 4)
+    orr r1, r1, #(1 << 1)
     str r1, [r0, #0xE0]
-    ldr r0, =0x58021000
+    ldr r0, =0x58020400
     ldr r1, [r0, #0]
-    bic r1, r1, #(3 << 2)
-    orr r1, r1, #(1 << 2)
+    bic r1, r1, #3
+    orr r1, r1, #1
     str r1, [r0, #0]
-    mov r1, #(1 << (1 + 16))
+    mov r1, #(1 << 16)
     str r1, [r0, #0x18]
 
     ldr r0, =_sbss

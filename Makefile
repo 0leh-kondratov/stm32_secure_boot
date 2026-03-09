@@ -53,12 +53,36 @@ demo-official:
 flash-demo-official: demo-official
 	st-flash write "$(CUBE_ROOT)/Projects/NUCLEO-H743ZI/Templates/build/Templates.bin" 0x08000000
 
-# Step 1: I2C1 (PB8/PB9) + LCD 1602 baseline. No FreeRTOS.
+# Step 1: FreeRTOS Logger + LED + App. Для платы — пересобрать main.o, startup.o, system (без STEP1_RENODE).
 step1:
+	@rm -f build/step1/main.o build/step1/startup.o build/step1/system_stm32h7xx.o
 	$(MAKE) -f app/step1/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
 
 flash-step1: step1
 	st-flash write build/step1/step1.bin 0x08000000
+
+# Полная очистка Flash, затем прошивка step1 (плата в начальное состояние)
+erase-flash-step1: step1
+	st-flash erase
+	st-flash write build/step1/step1.bin 0x08000000
+
+# Проверка платы: UART должен выводить "Step 1: OK". Порт: make test-board-step1 PORT=/dev/ttyUSB0
+test-board-step1:
+	@$(if $(PORT),./scripts/test_board_step1.sh $(PORT),./scripts/test_board_step1.sh)
+
+# То же с ручным сбросом (нажать Reset по запросу) — если после st-info порт не отдаёт данные
+test-board-step1-no-reset:
+	./scripts/test_board_step1.sh --no-reset
+
+# С прошивкой перед проверкой: make test-board-step1-flash
+test-board-step1-flash:
+	./scripts/test_board_step1.sh --flash
+
+# Step1 в Renode: сборка образа для эмуляции (HSI 64 MHz, без HSE) + подсказка запуска
+step1-renode:
+	$(MAKE) -f app/step1/Makefile renode CUBE_ROOT="$(CUBE_ROOT)" TOP="$(CURDIR)"
+	@echo "Run: renode step1.resc"
+	@echo "  UART: usart3 / telnet localhost 12345 — ожидается \"Step 1: OK\" каждые 2 с."
 
 # Step 2: FreeRTOS + DisplayTask (LCD counter 1s).
 step2:
@@ -96,4 +120,4 @@ clean-lwip:
 clean-tests:
 	rm -rf build/stage1 build/stage2
 
-.PHONY: all bootloader app signed-app minimal debug demo demo-renode flash-demo demo-official flash-demo-official lwip flash-lwip step1 flash-step1 step2 flash-step2 test-stage1 test-stage2 flash-stage1 flash-stage2 clean clean-demo clean-lwip clean-tests clean-step1 clean-step2
+.PHONY: all bootloader app signed-app minimal debug demo demo-renode flash-demo demo-official flash-demo-official lwip flash-lwip step1 flash-step1 erase-flash-step1 test-board-step1 test-board-step1-no-reset test-board-step1-flash step1-renode step2 flash-step2 test-stage1 test-stage2 flash-stage1 flash-stage2 clean clean-demo clean-lwip clean-tests clean-step1 clean-step2

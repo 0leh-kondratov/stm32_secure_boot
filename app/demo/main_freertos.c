@@ -1,6 +1,8 @@
 /*
- * Demo with FreeRTOS: 2 tasks blink LED1/LED2 + интерактивный шелл по UART.
- * Команды: help, led1 on|off, led2 on|off, led3 on|off, status.
+ * Demo with FreeRTOS: переключение LED1 → LED2 → LED3 → по кругу, 1 раз в 1 с.
+ * Без приглашения и команд — только цикл и одна строка в UART при старте.
+ * NUCLEO-H743ZI2 (MB1364): LED1=PB0, LED2=PE1, LED3=PB14 (управляет демо).
+ * LD4 (красный) — индикатор COM/питания со стороны ST-Link, не управляется МК; горит при питании/подключении по USB — это нормально.
  */
 #include <stdint.h>
 #include <string.h>
@@ -27,9 +29,12 @@
 #define LED3_PIN  14U
 
 #define LINE_MAX  48
+#define CYCLE_DELAY_MS_MIN  1000
+#define CYCLE_DELAY_MS_MAX  10000
 
-static volatile int led1_manual, led2_manual;
-static volatile int led1_override, led2_override;
+static volatile unsigned cycle_delay_ms = 1000;
+static volatile int led3_manual;
+static volatile int led3_override;
 
 #ifndef DEMO_USE_SYSTEM_CLOCK
 uint32_t SystemCoreClock = 64000000UL;
@@ -69,35 +74,24 @@ static void led3_set(int on)
     else    GPIOB_BSRR = (1U << LED3_PIN);
 }
 
-static void task_led1(void *pv)
+/* Медленный цикл: LED1 → LED2 → LED3 → LED1 … (один горит, остальные погашены) */
+static void task_led_cycle(void *pv)
 {
+    int cur = 0;
+    unsigned dms = 1500;
     (void)pv;
     for (;;) {
-        if (led1_manual)
-            led1_set(led1_override);
-        else {
-            led1_set(1);
-            vTaskDelay(pdMS_TO_TICKS(200));
-            led1_set(0);
-            vTaskDelay(pdMS_TO_TICKS(300));
-        }
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-}
-
-static void task_led2(void *pv)
-{
-    (void)pv;
-    for (;;) {
-        if (led2_manual)
-            led2_set(led2_override);
-        else {
-            led2_set(1);
-            vTaskDelay(pdMS_TO_TICKS(400));
-            led2_set(0);
-            vTaskDelay(pdMS_TO_TICKS(400));
-        }
-        vTaskDelay(pdMS_TO_TICKS(10));
+        dms = cycle_delay_ms;
+        if (dms < CYCLE_DELAY_MS_MIN) dms = CYCLE_DELAY_MS_MIN;
+        if (dms > CYCLE_DELAY_MS_MAX) dms = CYCLE_DELAY_MS_MAX;
+        led1_set(cur == 0);
+        led2_set(cur == 1);
+        if (led3_manual)
+            led3_set(led3_override);
+        else
+            led3_set(cur == 2);
+        vTaskDelay(pdMS_TO_TICKS(dms));
+        cur = (cur + 1) % 3;
     }
 }
 
@@ -114,8 +108,16 @@ static int str_prefix(const char *line, const char *cmd)
 static int led_arg(const char *p)
 {
     while (*p == ' ' || *p == '\t') p++;
+#ifdef DEMO_RENODE_AUTO_CMD
+    if (p[0] >= '0' && p[0] <= '9' && (p[1] == ' ' || p[1] == '\t' || !p[1])) p += 2;
+    while (*p == ' ' || *p == '\t') p++;
+#endif
     if (str_prefix(p, "on"))  return 1;
     if (str_prefix(p, "off")) return 0;
+#ifdef DEMO_RENODE_AUTO_CMD
+    if (*p == 'n' || *p == 'o') return 1; /* on → "n"/"o" при потере каждого 2-го символа */
+    if (*p == 'f') return 0;
+#endif
     return -1;
 }
 
@@ -127,44 +129,101 @@ static void run_cmd(char *line)
     while (*line == ' ' || *line == '\t' || *line == '\r' || *line == '\n') line++;
     if (!*line) return;
 
-    if (str_prefix(line, "help")) {
-        log_puts("help, led1/led2/led3 on|off, status\r\n");
+    if (str_prefix(line, "help")
+#ifdef DEMO_RENODE_AUTO_CMD
+        || str_prefix(line, "hlp")
+#endif
+        ) {
+        log_puts("help, led3 on|off, status, speed N (1-10 s)\r\n");
         return;
     }
-    if (str_prefix(line, "status")) {
-        /* active-low: ODR 0 = LED on */
+    if (str_prefix(line, "status")
+#ifdef DEMO_RENODE_AUTO_CMD
+        || str_prefix(line, "stts")
+#endif
+        ) {
         log_puts("LED1="); log_puts((GPIOB_ODR & (1U << LED1_PIN)) ? "OFF " : "ON ");
         log_puts(" LED2="); log_puts((GPIOE_ODR & (1U << LED2_PIN)) ? "OFF " : "ON ");
         log_puts(" LED3="); log_puts((GPIOB_ODR & (1U << LED3_PIN)) ? "OFF\r\n" : "ON\r\n");
         return;
     }
-    if (str_prefix(line, "led1")) {
-        int a = led_arg(line + 4);
-        if (a >= 0) { led1_manual = 1; led1_override = a; log_puts(a ? "LED1 on\r\n" : "LED1 off\r\n"); return; }
-        led1_manual = 0; log_puts("LED1 auto\r\n"); return;
+    if (str_prefix(line, "speed")
+#ifdef DEMO_RENODE_AUTO_CMD
+        || str_prefix(line, "spd")
+#endif
+        ) {
+        const char *arg = line + 5;
+#ifdef DEMO_RENODE_AUTO_CMD
+        if (str_prefix(line, "spd")) arg = line + 3;
+#endif
+        while (*arg == ' ' || *arg == '\t') arg++;
+        if (*arg >= '1' && *arg <= '9') {
+            unsigned n = (unsigned)(*arg - '0');
+            if (arg[1] >= '0' && arg[1] <= '9') n = n * 10 + (unsigned)(arg[1] - '0');
+            if (n >= 1 && n <= 10) {
+                cycle_delay_ms = n * 1000;
+                if (n >= 10) log_puts("speed 10");
+                else { char e[2] = { (char)('0' + n), 0 }; log_puts("speed "); log_puts(e); }
+                log_puts(" s\r\n");
+                return;
+            }
+        }
+        log_puts("speed 1..10 (seconds per LED)\r\n");
+        return;
     }
-    if (str_prefix(line, "led2")) {
-        int a = led_arg(line + 4);
-        if (a >= 0) { led2_manual = 1; led2_override = a; log_puts(a ? "LED2 on\r\n" : "LED2 off\r\n"); return; }
-        led2_manual = 0; log_puts("LED2 auto\r\n"); return;
-    }
-    if (str_prefix(line, "led3")) {
-        int a = led_arg(line + 4);
-        if (a >= 0) { led3_set(a); log_puts(a ? "LED3 on\r\n" : "LED3 off\r\n"); return; }
-        log_puts("led3 on|off\r\n"); return;
+    if (str_prefix(line, "led3")
+#ifdef DEMO_RENODE_AUTO_CMD
+        || str_prefix(line, "ld3")
+#endif
+        ) {
+        const char *arg = line + 4;
+#ifdef DEMO_RENODE_AUTO_CMD
+        if (str_prefix(line, "ld3")) arg = line + 3;
+#endif
+        int a = led_arg(arg);
+        if (a >= 0) {
+            led3_manual = 1;
+            led3_override = a;
+            led3_set(a);
+            log_puts(a ? "LED3 on (fixed)\r\n" : "LED3 off (fixed)\r\n");
+            return;
+        }
+        led3_manual = 0;
+        log_puts("LED3 in cycle\r\n");
+        return;
     }
     log_puts("? type help\r\n");
 }
+
+#ifdef DEMO_RENODE_AUTO_CMD
+/* В Renode: раз в 5 с выводим status (цикл LED уже крутится в task_led_cycle). */
+static void task_auto_cmd(void *pv)
+{
+    (void)pv;
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        { char line[16]; strcpy(line, "status"); run_cmd(line); }
+        log_puts("> ");
+    }
+}
+#endif
+
+#define SHELL_IDLE_MS  400
 
 static void task_shell(void *pv)
 {
     char buf[LINE_MAX];
     int len = 0;
     (void)pv;
-    /* Приглашение уже выведено из main(); здесь только цикл ввода */
+#ifdef DEMO_RENODE_AUTO_CMD
+    TickType_t last_char = 0;
+#endif
     for (;;) {
         int c = log_getchar();
         if (c >= 0) {
+#ifdef DEMO_RENODE_AUTO_CMD
+            last_char = xTaskGetTickCount();
+#endif
             if (c == '\r' || c == '\n') {
                 log_puts("\r\n");
                 if (len > 0) { buf[len] = '\0'; run_cmd(buf); len = 0; }
@@ -174,6 +233,17 @@ static void task_shell(void *pv)
                 if (c >= 32 && c < 127) { char e[2] = { (char)c, 0 }; log_puts(e); }
             }
         }
+#ifdef DEMO_RENODE_AUTO_CMD
+        /* В Renode \r/\n часто теряются (UART #487). Отправка по таймауту: пауза ~400 мс = ввод команды завершён */
+        if (len > 0 && (xTaskGetTickCount() - last_char) >= pdMS_TO_TICKS(SHELL_IDLE_MS)) {
+            buf[len] = '\0';
+            log_puts("\r\n");
+            run_cmd(buf);
+            len = 0;
+            log_puts("> ");
+            last_char = xTaskGetTickCount();
+        }
+#endif
         vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
@@ -185,20 +255,20 @@ extern void SystemCoreClockUpdate(void);
 
 int main(void)
 {
+    /* Ранний UART до любого другого init — если зависаем в SystemInit/leds_init, хоть это увидим */
+    log_init();
+    log_puts("Demo start\r\n");
 #ifdef DEMO_USE_SYSTEM_CLOCK
-    SystemInit();
-    SystemCoreClockUpdate();
+    SystemCoreClock = 64000000UL;
+    log_puts("clock ok\r\n");
 #endif
     leds_init();
-    led3_set(1);
-    log_init();
-    log_puts("Demo UART OK\r\n");
-    log_puts("\r\nFreeRTOS interactive. Type 'help'.\r\n> ");
+    led1_set(1);
+    led2_set(0);
+    led3_set(0);
+    log_puts("Demo OK\r\n");
 
-    xTaskCreate(task_led1, "L1", configMINIMAL_STACK_SIZE * 2, NULL, 1, NULL);
-    xTaskCreate(task_led2, "L2", configMINIMAL_STACK_SIZE * 2, NULL, 1, NULL);
-    xTaskCreate(task_shell, "SH", configMINIMAL_STACK_SIZE * 6, NULL, 2, NULL);
-
+    xTaskCreate(task_led_cycle, "LED", configMINIMAL_STACK_SIZE * 4, NULL, 1, NULL);
     vTaskStartScheduler();
     for (;;) { }
     return 0;

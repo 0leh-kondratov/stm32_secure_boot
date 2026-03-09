@@ -23,7 +23,7 @@ extern uint32_t SystemCoreClock;
 #define configMAX_PRIORITIES                     (8)
 #define configUSE_MINI_LIST_ITEM                 1
 #define configMINIMAL_STACK_SIZE                 ((uint16_t)128)
-#define configTOTAL_HEAP_SIZE                    ((size_t)(4 * 1024))
+#define configTOTAL_HEAP_SIZE                    ((size_t)(8 * 1024))
 #define configMAX_TASK_NAME_LEN                  (12)
 #define configUSE_16_BIT_TICKS                   0
 #define configIDLE_SHOULD_YIELD                  1
@@ -44,6 +44,7 @@ extern uint32_t SystemCoreClock;
 #define xPortPendSVHandler PendSV_Handler
 
 #define INCLUDE_vTaskDelay               1
+#define INCLUDE_xTaskGetSchedulerState   1
 #define INCLUDE_xTaskGetCurrentTaskHandle 0
 
 #endif /* FREERTOS_CONFIG_H */

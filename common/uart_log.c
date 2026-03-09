@@ -127,6 +127,18 @@ int log_getchar(void)
 void log_puts(const char *s)
 {
     if (!s) return;
+#ifdef DEMO_RENODE_AUTO_CMD
+    /* Сборка для Renode: не ждём TXE. vTaskDelay только после старта планировщика, иначе main() зависнет и перебор LED не запустится. */
+    while (*s) {
+        UART_TDR = (uint32_t)(unsigned char)*s++;
+        if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING)
+            vTaskDelay(pdMS_TO_TICKS(1));
+        else {
+            for (volatile int i = 0; i < 8000; i++) (void)i;
+        }
+    }
+    return;
+#endif
     while (*s) {
         uint32_t n = LOG_PUTS_TX_TIMEOUT;
         while ((UART_ISR & USART_ISR_TXE) == 0 && n != 0)

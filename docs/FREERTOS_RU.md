@@ -142,12 +142,34 @@ SRCS  += $(FREERTOS_SRC)/tasks.c $(FREERTOS_SRC)/queue.c $(FREERTOS_SRC)/list.c 
 
 ---
 
-## 4. Кратко
+## 4. Shell и FreeRTOS-Plus-CLI
+
+В **ядре FreeRTOS встроенного shell нет** — только планировщик, задачи, очереди. В демо проекта шелл реализован вручную: задача читает UART (`log_getchar()`), накапливает строку и парсит команды в `run_cmd()`.
+
+**FreeRTOS-Plus-CLI** — отдельная библиотека из семейства FreeRTOS-Plus (тот же вендор). Даёт:
+
+- регистрацию команд (имя, help-строка, callback);
+- разбор параметров (`FreeRTOS_CLIGetParameter()` и др.);
+- один вызов на всю строку ввода.
+
+Ввод/вывод по-прежнему свои: UART, буфер строки и задача, которая передаёт готовые строки в `FreeRTOS_CLIProcessInput()`.
+
+| Ситуация | Рекомендация |
+|----------|--------------|
+| Мало команд (как сейчас: help, led1/2/3, status) | Текущего минимального шелла достаточно, CLI не обязателен. |
+| Много команд, параметры, общая справка | Имеет смысл добавить **FreeRTOS-Plus-CLI**: проще добавлять команды и парсить аргументы. |
+
+Документация и исходники: [FreeRTOS-Plus-CLI](https://www.freertos.org/Documentation/03-Libraries/02-FreeRTOS-plus/03-FreeRTOS-plus-CLI/01-FreeRTOS-plus-CLI). Исходники можно взять из репозитория FreeRTOS/FreeRTOS (каталог FreeRTOS-Plus) или с [freertos.org](https://www.freertos.org/a00104.html). Интеграция: добавить `FreeRTOS_CLI.c`, реализовать вывод (например через `log_puts()`), в задаче шелла после сбора строки вызывать `FreeRTOS_CLIProcessInput()` вместо своего `run_cmd()`.
+
+---
+
+## 5. Кратко
 
 | Вопрос | Ответ |
 |--------|--------|
 | **Установить** | Взять исходники из STM32CubeH7 (`Middlewares/Third_Party/FreeRTOS`) или с freertos.org и добавить их в проект (IDE или Makefile). |
 | **Запустить** | Настроить `FreeRTOSConfig.h`, дать FreeRTOS тик от SysTick, в `main()` вызвать `osKernelInitialize()` → создать задачи через `osThreadNew()` → `osKernelStart()` (или нативно `xTaskCreate` + `vTaskStartScheduler()`). |
 | **Проверить без своего кода** | Открыть в STM32CubeIDE пример `Projects/NUCLEO-H743ZI/Applications/FreeRTOS/FreeRTOS_ThreadCreation`, собрать и прошить плату — два потока будут мигать LED. |
+| **Shell / CLI** | В ядре shell нет. Текущий шелл — свой. Для расширения на много команд можно добавить FreeRTOS-Plus-CLI (см. разд. 4). |
 
 Документ UM1722 «Developing Applications on STM32Cube with RTOS» описывает интеграцию FreeRTOS в проектах ST в деталях.

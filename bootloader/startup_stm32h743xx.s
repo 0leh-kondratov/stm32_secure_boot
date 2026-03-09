@@ -62,6 +62,7 @@ Reset_Handler:
 
     ldr r0, =_sbss
     ldr r1, =_ebss
+    mov r2, #0
     b 2f
 1:  str r2, [r0]
     adds r0, r0, #4

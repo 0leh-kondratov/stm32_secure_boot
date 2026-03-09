@@ -4,13 +4,13 @@
 # Проверка эмуляции без бутлоадера и подписи. Образ тот же, что прошивается make flash-demo.
 #
 # Запуск из корня проекта:
-#   make demo
+#   make demo-renode
 #   renode demo.resc
-# Без GUI (вывод UART в консоль, без предупреждений GTK):
-#   renode --disable-gui demo.resc
+# (make demo-renode — образ с автокомандами раз в 5 с: status + переключение LED3; иначе в Renode команды по telnet не работают из-за бага UART RX, renode#487.)
+# Без GUI: renode --disable-gui demo.resc
 #
-# В окне usart3: "Demo UART OK", приглашение "FreeRTOS interactive. Type 'help'.", "> " (вывод из main до старта планировщика).
-# Ввод в Renode: telnet localhost 12345 (или nc localhost 12345) — там вводить help, led3 on и т.д.
+# В окне usart3: "Demo UART OK", приглашение "FreeRTOS interactive...", затем раз в 5 с — статус LED и LED3 on/off (auto).
+# На плате (make demo + flash-demo): telnet не нужен, команды вводятся по UART (help, led3 on и т.д.).
 #
 # --- GDB ---
 # Подключение во втором терминале:
@@ -34,7 +34,7 @@
 # Для отладки: logLevel 0 или 1.
 
 using sysbus
-logLevel 4
+logLevel 1
 mach create "stm32h7"
 machine LoadPlatformDescription @platforms/cpus/stm32h743.repl
 

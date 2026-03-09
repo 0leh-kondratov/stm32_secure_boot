@@ -15,6 +15,9 @@ CFLAGS += -DUART_LOG_USE_USART3 -DUART_LOG_FREERTOS_YIELD
 ifneq ($(CUBE_EXISTS),)
   CFLAGS += -I $(CUBE_ROOT)/Drivers/CMSIS/Device/ST/STM32H7xx/Include -I $(CUBE_ROOT)/Drivers/CMSIS/Include -DSTM32H743xx -DDEMO_USE_SYSTEM_CLOCK
 endif
+ifeq ($(DEMO_RENODE),1)
+  CFLAGS += -DDEMO_RENODE_AUTO_CMD
+endif
 LDFLAGS = -T $(TOP)/app/demo/demo.ld -nostdlib -Wl,--gc-sections -lgcc -specs=nosys.specs -lc
 
 FREERTOS_SRC = $(TOP)/FreeRTOS/Source
@@ -92,4 +95,10 @@ clean:
 	@rm -f config-copied
 	rm -rf $(BUILD)
 
-.PHONY: all clean
+# Сборка для Renode: раз в 5 с вывод status и переключение LED3 (обход бага UART RX в Renode, issue #487)
+renode: clean-main
+	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) all DEMO_RENODE=1 TOP="$(TOP)" CUBE_ROOT="$(CUBE_ROOT)"
+clean-main:
+	@rm -f $(BUILD)/main_freertos.o
+
+.PHONY: all clean renode clean-main

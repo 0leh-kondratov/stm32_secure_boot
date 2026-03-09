@@ -26,6 +26,9 @@ debug:
 
 demo:
 	$(MAKE) -f app/demo/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
+# Demo для Renode: автокоманды раз в 5 с (обход бага UART RX в эмуляторе)
+demo-renode:
+	$(MAKE) -f app/demo/Makefile renode CUBE_ROOT="$(CUBE_ROOT)" TOP="$(CURDIR)"
 
 # LwIP + FreeRTOS + TCP echo server (NUCLEO-H743ZI). Requires CUBE_ROOT with Drivers and Middlewares.
 lwip:
@@ -93,4 +96,4 @@ clean-lwip:
 clean-tests:
 	rm -rf build/stage1 build/stage2
 
-.PHONY: all bootloader app signed-app minimal debug demo flash-demo demo-official flash-demo-official lwip flash-lwip step1 flash-step1 step2 flash-step2 test-stage1 test-stage2 flash-stage1 flash-stage2 clean clean-demo clean-lwip clean-tests clean-step1 clean-step2
+.PHONY: all bootloader app signed-app minimal debug demo demo-renode flash-demo demo-official flash-demo-official lwip flash-lwip step1 flash-step1 step2 flash-step2 test-stage1 test-stage2 flash-stage1 flash-stage2 clean clean-demo clean-lwip clean-tests clean-step1 clean-step2

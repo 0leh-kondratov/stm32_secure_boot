@@ -6,10 +6,11 @@ OUTPUT_FORMAT("elf32-littlearm")
 OUTPUT_ARCH(arm)
 ENTRY(Reset_Handler)
 
+/* 128K RAM: совместимо с Renode (в repl обычно 128K); на плате H743 есть 512K — достаточно 128K для demo */
 MEMORY
 {
     FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 2048K
-    RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 512K
+    RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 128K
 }
 
 _estack = ORIGIN(RAM) + LENGTH(RAM);

@@ -37,7 +37,9 @@ OBJ = $(BUILD)/main_freertos.o $(BUILD)/uart_log.o $(BUILD)/startup.o $(BUILD)/m
       $(BUILD)/tasks.o $(BUILD)/queue.o $(BUILD)/list.o $(BUILD)/timers.o \
       $(BUILD)/heap_4.o $(BUILD)/port.o
 ifneq ($(CUBE_EXISTS),)
-  OBJ += $(BUILD)/system_stm32h7xx.o
+  ifneq ($(DEMO_RENODE),1)
+    OBJ += $(BUILD)/system_stm32h7xx.o
+  endif
 endif
 
 $(BUILD)/tasks.o: config-copied
@@ -79,8 +81,10 @@ $(BUILD)/port.o: $(PORT)/port.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 ifneq ($(CUBE_EXISTS),)
+  ifneq ($(DEMO_RENODE),1)
 $(BUILD)/system_stm32h7xx.o: $(FREERTOS_SRC)/system_stm32h7xx.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
+  endif
 endif
 
 $(BUILD)/demo.elf: $(OBJ) $(TOP)/app/demo/demo.ld
@@ -99,6 +103,6 @@ clean:
 renode: clean-main
 	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) all DEMO_RENODE=1 TOP="$(TOP)" CUBE_ROOT="$(CUBE_ROOT)"
 clean-main:
-	@rm -f $(BUILD)/main_freertos.o
+	@rm -f $(BUILD)/main_freertos.o $(BUILD)/uart_log.o
 
 .PHONY: all clean renode clean-main

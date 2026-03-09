@@ -1,0 +1,3 @@
+14:20:21.3644 [INFO] Loaded monitor commands from: /opt/renode/scripts/monitor.py
+14:20:22.1622 [INFO] Including script(s): /data/projects/stm32_secure_boot/demo.resc
+14:29:48.3911 [ERROR] cpu: CPU abort [PC=0x8200000]: Trying to execute code outside RAM or ROM at 0x08200000.

@@ -1,7 +1,9 @@
 /**
- * Step 1: Hardware Baseline — I2C2 (PF1/PF0) scanner + LCD 1602 (PCF8574 @ 0x27).
- * No FreeRTOS. HAL from STM32CubeH7.
+ * Step 1: Hardware Baseline — I2C1 (PB8 SCL, PB9 SDA) scanner + LCD 1602 (PCF8574 @ 0x27).
+ * NO FreeRTOS — bare metal, only HAL. One main() loop.
  * Verification: "Device Found at 0x27" on UART; "Ready" on LCD.
+ * NUCLEO-H743ZI2: I2C1 on Arduino D15 (PB8)=SCL, D14 (PB9)=SDA.
+ * LED1=PB0: blink at start = we reached main().
  */
 #include <stdint.h>
 #include <stdbool.h>
@@ -9,23 +11,23 @@
 #include "uart_log.h"
 #include "lcd_1602_i2c.h"
 
-I2C_HandleTypeDef hi2c2;
+I2C_HandleTypeDef hi2c1;
 
 static void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_I2C2_Init(void);
+static void MX_I2C1_Init(void);
 
 /** Scan I2C bus (0x03..0x77). Returns true if device at 7-bit addr is present. */
 static bool I2C_Scan_IsDevicePresent(uint8_t addr_7bit)
 {
   uint8_t dev = (uint8_t)(addr_7bit << 1);
-  return (HAL_I2C_IsDeviceReady(&hi2c2, dev, 2, 50) == HAL_OK);
+  return (HAL_I2C_IsDeviceReady(&hi2c1, dev, 2, 50) == HAL_OK);
 }
 
 /** Scan and print found addresses to UART. Returns true if 0x27 found. */
 static bool I2C_Scan(void)
 {
-  log_puts("I2C2 (PF1 SCL, PF0 SDA) scan...\r\n");
+  log_puts("I2C1 (PB8 SCL, PB9 SDA) scan...\r\n");
   bool found_27 = false;
   for (uint8_t addr = 0x03; addr <= 0x77; addr++)
   {
@@ -51,14 +53,38 @@ static bool I2C_Scan(void)
   return found_27;
 }
 
+/* LED1 = PB0 (NUCLEO active-low: 0=on). No HAL GPIO init — direct regs for earliest blink. */
+static void led1_blink(int times)
+{
+  RCC_TypeDef *rcc = RCC;
+  GPIO_TypeDef *gpio_b = GPIOB;
+  rcc->AHB4ENR |= RCC_AHB4ENR_GPIOBEN;
+  gpio_b->MODER = (gpio_b->MODER & ~(3U << 0)) | (1U << 0);
+  for (int i = 0; i < times; i++) {
+    gpio_b->BSRR = (1U << 0);       /* PB0 low = LED on */
+    for (volatile uint32_t d = 0; d < 500000U; d++) { (void)d; }
+    gpio_b->BSRR = (1U << (0 + 16)); /* PB0 high = LED off */
+    for (volatile uint32_t d = 0; d < 500000U; d++) { (void)d; }
+  }
+}
+
 int main(void)
 {
   HAL_Init();
-  SystemClock_Config();
-  MX_GPIO_Init();
-  MX_I2C2_Init();
+
+  led1_blink(5);
 
   log_init();
+  log_puts("\r\n=== Step1 START ===\r\n");
+  log_puts("DBG: UART after init\r\n");
+
+  SystemClock_Config();
+  log_puts("DBG: Clock OK\r\n");
+
+  MX_GPIO_Init();
+  MX_I2C1_Init();
+  log_puts("DBG: GPIO I2C init OK\r\n");
+
   log_puts("\r\n=== Step 1: I2C + LCD Baseline ===\r\n");
 
   if (!I2C_Scan())
@@ -67,7 +93,7 @@ int main(void)
     for (;;) HAL_Delay(1000);
   }
 
-  if (!LCD_1602_Init(&hi2c2))
+  if (!LCD_1602_Init(&hi2c1))
   {
     log_puts("LCD_Init failed.\r\n");
     for (;;) HAL_Delay(1000);
@@ -108,35 +134,35 @@ static void SystemClock_Config(void)
 
 static void MX_GPIO_Init(void)
 {
-  __HAL_RCC_GPIOF_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 }
 
-/** I2C2 on PF1 (SCL), PF0 (SDA) — CN8 labels I2C2_SCL/I2C2_SDA on NUCLEO-H743ZI. */
-static void MX_I2C2_Init(void)
+/** I2C1 on PB8 (SCL), PB9 (SDA) — Arduino D15/D14 on NUCLEO-H743ZI2. */
+static void MX_I2C1_Init(void)
 {
   GPIO_InitTypeDef g = {0};
 
-  __HAL_RCC_I2C2_CLK_ENABLE();
-  g.Pin = GPIO_PIN_0 | GPIO_PIN_1;
+  __HAL_RCC_I2C1_CLK_ENABLE();
+  g.Pin = GPIO_PIN_8 | GPIO_PIN_9;
   g.Mode = GPIO_MODE_AF_OD;
   g.Pull = GPIO_NOPULL;
   g.Speed = GPIO_SPEED_FREQ_LOW;
-  g.Alternate = GPIO_AF4_I2C2;
-  HAL_GPIO_Init(GPIOF, &g);
+  g.Alternate = GPIO_AF4_I2C1;
+  HAL_GPIO_Init(GPIOB, &g);
 
-  hi2c2.Instance = I2C2;
-  hi2c2.Init.Timing = 0x10909CEC; /* 100 kHz @ 200 MHz APB1 */
-  hi2c2.Init.OwnAddress1 = 0;
-  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c2.Init.OwnAddress2 = 0;
-  hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
-  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c2) != HAL_OK) for (;;);
-  (void)HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE);
-  (void)HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0);
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x10909CEC; /* 100 kHz @ 200 MHz APB1 */
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK) for (;;);
+  (void)HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE);
+  (void)HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0);
 }
 
 void SysTick_Handler(void)

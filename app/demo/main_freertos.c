@@ -36,7 +36,7 @@ static volatile unsigned cycle_delay_ms = 1000;
 static volatile int led3_manual;
 static volatile int led3_override;
 
-#ifndef DEMO_USE_SYSTEM_CLOCK
+#if defined(DEMO_RENODE_AUTO_CMD) || !defined(DEMO_USE_SYSTEM_CLOCK)
 uint32_t SystemCoreClock = 64000000UL;
 #else
 extern uint32_t SystemCoreClock;
@@ -75,11 +75,20 @@ static void led3_set(int on)
 }
 
 /* Медленный цикл: LED1 → LED2 → LED3 → LED1 … (один горит, остальные погашены) */
+#ifdef DEMO_RENODE_AUTO_CMD
+/* В Renode SysTick часто не тикает — vTaskDelay не возвращается. Busy-wait ~1 c при 64 MHz. */
+static void delay_approx_1s(void)
+{
+    for (volatile uint32_t i = 0; i < 16000000UL; i++) { (void)i; }
+}
+#endif
+
 static void task_led_cycle(void *pv)
 {
     int cur = 0;
-    unsigned dms = 1500;
+    unsigned dms = 1000;
     (void)pv;
+    log_puts("[DBG] LED task running\r\n");
     for (;;) {
         dms = cycle_delay_ms;
         if (dms < CYCLE_DELAY_MS_MIN) dms = CYCLE_DELAY_MS_MIN;
@@ -90,7 +99,15 @@ static void task_led_cycle(void *pv)
             led3_set(led3_override);
         else
             led3_set(cur == 2);
+        /* Отладка: какой LED горит (L1/L2/L3) */
+        if (cur == 0) log_puts("[LED] LED1 on\r\n");
+        else if (cur == 1) log_puts("[LED] LED2 on\r\n");
+        else log_puts("[LED] LED3 on\r\n");
+#ifdef DEMO_RENODE_AUTO_CMD
+        delay_approx_1s();
+#else
         vTaskDelay(pdMS_TO_TICKS(dms));
+#endif
         cur = (cur + 1) % 3;
     }
 }
@@ -255,21 +272,44 @@ extern void SystemCoreClockUpdate(void);
 
 int main(void)
 {
-    /* Ранний UART до любого другого init — если зависаем в SystemInit/leds_init, хоть это увидим */
+    /* Ранний UART и сразу LED — видно, что дошли до main, даже если дальше зависаем */
     log_init();
-    log_puts("Demo start\r\n");
-#ifdef DEMO_USE_SYSTEM_CLOCK
-    SystemCoreClock = 64000000UL;
-    log_puts("clock ok\r\n");
-#endif
     leds_init();
     led1_set(1);
     led2_set(0);
     led3_set(0);
-    log_puts("Demo OK\r\n");
+    log_puts("[DBG] Demo start\r\n");
+#if defined(DEMO_USE_SYSTEM_CLOCK) && !defined(DEMO_RENODE_AUTO_CMD)
+    SystemCoreClock = 64000000UL;
+    log_puts("[DBG] clock ok\r\n");
+#elif defined(DEMO_RENODE_AUTO_CMD)
+    log_puts("[DBG] clock 64M (renode)\r\n");
+#endif
+    log_puts("[DBG] GPIO ok\r\n");
+    log_puts("[DBG] Demo OK\r\n");
+    log_puts("[DBG] creating LED task...\r\n");
 
-    xTaskCreate(task_led_cycle, "LED", configMINIMAL_STACK_SIZE * 4, NULL, 1, NULL);
+    BaseType_t cr;
+#ifdef DEMO_RENODE_AUTO_CMD
+    /* Renode: статический стек и TCB в .bss — обходим зависание xTaskCreate (pvPortMalloc/куча в эмуляторе) */
+    static StackType_t led_stack[configMINIMAL_STACK_SIZE * 4];
+    static StaticTask_t led_tcb;
+    log_puts("[DBG] before xTaskCreateStatic\r\n");
+    TaskHandle_t h = xTaskCreateStatic(task_led_cycle, "LED", configMINIMAL_STACK_SIZE * 4, NULL, 1, led_stack, &led_tcb);
+    log_puts("[DBG] after xTaskCreateStatic\r\n");
+    cr = (h != NULL) ? pdPASS : pdFAIL;
+#else
+    cr = xTaskCreate(task_led_cycle, "LED", configMINIMAL_STACK_SIZE * 4, NULL, 1, NULL);
+#endif
+    log_puts("[DBG] xTaskCreate done\r\n");
+    if (cr != pdPASS) {
+        log_puts("[DBG] ERR: LED task FAIL\r\n");
+    } else {
+        log_puts("[DBG] LED task ok\r\n");
+    }
+    log_puts("[DBG] start sched\r\n");
     vTaskStartScheduler();
+    log_puts("[DBG] ERR: sched returned\r\n");
     for (;;) { }
     return 0;
 }

@@ -1,5 +1,6 @@
 # Step 1: Hardware Baseline — I2C1 (PB8/PB9) + LCD 1602. No FreeRTOS.
 # Run from project root: make step1   → build/step1/step1.bin
+# If UART shows nothing, try: make step1 UART_9600=1  and open terminal at 9600 8N1.
 TOP      ?= $(CURDIR)
 CUBE_ROOT ?= $(abspath $(TOP)/../STM32CubeH7)
 
@@ -9,7 +10,10 @@ OBJCOPY  = arm-none-eabi-objcopy
 AS       = arm-none-eabi-gcc -x assembler-with-cpp
 
 CFLAGS   = -mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=c11 -Wall -O2
-CFLAGS  += -DSTM32H743xx -DUSE_HAL_DRIVER -DUSE_PWR_LDO_SUPPLY -DUART_LOG_USE_USART3
+CFLAGS  += -DSTM32H743xx -DUSE_HAL_DRIVER -DUSE_PWR_LDO_SUPPLY
+ifdef UART_9600
+CFLAGS  += -DSTEP1_UART_9600
+endif
 CFLAGS  += -I$(TOP)/common
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/CMSIS/Include
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/CMSIS/Device/ST/STM32H7xx/Include

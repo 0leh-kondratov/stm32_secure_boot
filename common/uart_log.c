@@ -26,9 +26,6 @@
 #define USART_ISR_TXE       (1U << 7)
 #define USART_ISR_RXNE      (1U << 5)
 
-/* BRR is computed at runtime when HAL is available. */
-#define UART_BRR_FALLBACK_115200_AT_64MHZ (35U)
-
 #if defined(UART_LOG_USE_USART3)
 /* USART3, PD8 (TX), PD9 (RX) */
 #define RCC_AHB4ENR_GPIOXEN (1U << 3)
@@ -83,23 +80,29 @@ void log_init(void)
     GPIOX_AFRL = (GPIOX_AFRL & ~AFR_MASK) | AFR_VAL;
 #endif
 
-    uint32_t brr = UART_BRR_FALLBACK_115200_AT_64MHZ;
-#define UART_DIV_115200_16X  (16U * 115200U)  /* 1843200: BRR = PCLK1 / this */
+#if defined(STEP1_UART_9600)
+#define UART_DIV_16X  (16U * 9600U)
+#define UART_BRR_FALLBACK_AT_64MHZ (417U)
+#else
+#define UART_DIV_16X  (16U * 115200U)
+#define UART_BRR_FALLBACK_AT_64MHZ (35U)
+#endif
+    uint32_t brr = UART_BRR_FALLBACK_AT_64MHZ;
 #ifdef USE_HAL_DRIVER
-    /* USART2/3 are on APB1. After SystemClock_Config(), HAL knows the real PCLK1. */
+    /* USART2/3 are on APB1. At log_init() PCLK1 may be default (e.g. 64 MHz). */
     uint32_t pclk1 = HAL_RCC_GetPCLK1Freq();
     if (pclk1 != 0U) {
-        brr = (pclk1 + (UART_DIV_115200_16X / 2U)) / UART_DIV_115200_16X;
+        brr = (pclk1 + (UART_DIV_16X / 2U)) / UART_DIV_16X;
         if (brr == 0U) brr = 1U;
     }
-#elif defined(DEMO_USE_SYSTEM_CLOCK)
+#elif defined(DEMO_USE_SYSTEM_CLOCK) && !defined(DEMO_RENODE_AUTO_CMD)
     /* Demo/Test with system_stm32h7xx: PCLK1 = SystemD2Clock / D2PPRE1. */
     extern uint32_t SystemD2Clock;
     uint32_t d2ppre1 = (RCC_D2CFGR >> 8U) & 7U;
     if (d2ppre1 > 4U) d2ppre1 = 4U;
     uint32_t pclk1 = SystemD2Clock >> d2ppre1;
     if (pclk1 != 0U) {
-        brr = (pclk1 + (UART_DIV_115200_16X / 2U)) / UART_DIV_115200_16X;
+        brr = (pclk1 + (UART_DIV_16X / 2U)) / UART_DIV_16X;
         if (brr == 0U) brr = 1U;
     }
 #endif
@@ -108,6 +111,17 @@ void log_init(void)
 
     /* Short delay so host terminal / USB-VCP is ready after reset */
     delay_loop(500000U);
+
+    /* Debug: raw static message (no log_puts) to verify UART TX */
+    {
+        const char *raw = "UART init OK\r\n";
+        while (*raw) {
+            uint32_t n = 100000U;
+            while ((UART_ISR & USART_ISR_TXE) == 0 && n) n--;
+            UART_TDR = (uint32_t)(unsigned char)*raw++;
+            delay_loop(1000U);
+        }
+    }
 }
 
 int log_getchar(void)

@@ -1,4 +1,4 @@
-# demo.resc — эмуляция standalone demo (FreeRTOS, 3 LED + UART) на STM32H743 в Renode
+# demo.resc — эмуляция standalone demo (FreRTOS, 3 LEDe + UART) на STM32H743 в Renode
 # Исходники: app/demo. Сборка: make demo → build/demo/demo.elf
 #
 # Проверка эмуляции без бутлоадера и подписи. Образ тот же, что прошивается make flash-demo.
@@ -34,9 +34,13 @@
 # Для отладки: logLevel 0 или 1.
 
 using sysbus
-logLevel 1
+logLevel 3
 mach create "stm32h7"
 machine LoadPlatformDescription @platforms/cpus/stm32h743.repl
+
+# Workaround: при xTaskCreate FreeRTOS пишет по 0x1FEADB00; в repl нет RAM по этому адресу — подключаем доп. область из .repl (в resc нельзя \n в строке)
+# Доп. RAM 0x1FE00000 (workaround для xTaskCreate). Путь: из корня проекта или полный, напр. @/data/projects/stm32_secure_boot/demo_ram_extra.repl
+machine LoadPlatformDescription @demo_ram_extra.repl
 
 # Standalone demo по 0x08000000 (тот же образ, что прошивается на плату без бутлоадера)
 sysbus LoadELF @build/demo/demo.elf

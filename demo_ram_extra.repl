@@ -1,0 +1,5 @@
+ram_extra: Memory.MappedMemory @ sysbus 0x1FE00000
+    size: 0x100000
+
+ram_stack_below: Memory.MappedMemory @ sysbus 0x1FFFF000
+    size: 0x1000

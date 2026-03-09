@@ -19,7 +19,7 @@ SECTIONS
 {
     .isr_vector :
     {
-        . = ALIGN(4);
+        . = ALIGN(128);   /* VTOR requires 128-byte aligned vector table */
         KEEP(*(.isr_vector))
         . = ALIGN(4);
     } > FLASH

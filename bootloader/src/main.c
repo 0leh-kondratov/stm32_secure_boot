@@ -41,13 +41,16 @@
 #define HASH_STR_NBLW_POS      (0U)
 #define HASH_STR_NBLW_MASK     (0x3FU)
 
-/* GPIO for error LED LD3 (red) on NUCLEO-144: PB14 */
+/* GPIO for error LED LD3 (red) on NUCLEO-144: PB14; LED1 (green) PB0 for early feedback */
 #define GPIOB_BASE             (0x58020400UL)
 #define GPIOB_MODER            (*(volatile uint32_t *)(GPIOB_BASE + 0x00U))
 #define GPIOB_BSRR             (*(volatile uint32_t *)(GPIOB_BASE + 0x18U))
 #define RCC_AHB4ENR            (*(volatile uint32_t *)(RCC_BASE + 0xE0U))
 #define RCC_AHB4ENR_GPIOBEN    (1U << 1)
 #define LED3_PIN               (14U)
+#define LED1_PIN               (0U)
+
+#define MAX_IMAGE_SIZE         (1024U * 1024U)  /* 1 MB sanity cap */
 
 // These addresses are examples and must match your linker script (memory_map.ld).
 // IMAGE_HEADER_ADDRESS should point to the start of image_header_t.
@@ -97,6 +100,10 @@ bool verify_signature(void)
 
     if (hdr->image_size == 0U) {
         log_puts("  FAIL: image_size=0\r\n");
+        return false;
+    }
+    if (hdr->image_size > MAX_IMAGE_SIZE) {
+        log_puts("  FAIL: image_size too large\r\n");
         return false;
     }
     log_puts("  size OK\r\n");
@@ -318,13 +325,15 @@ static void signal_verification_failure(void)
 
 /**
  * Jump to application at entry point from image header.
- * Disables interrupts, sets MSP and vector table, then branches.
+ * Sets VTOR so app uses its own vector table, then sets MSP and branches to Reset_Handler.
  */
 static void jump_to_application(uint32_t entry_point)
 {
     const uint32_t *app_vectors = (const uint32_t *)entry_point;
     uint32_t app_msp;
     uint32_t app_reset;
+    /* Cortex-M7 VTOR: vector table base (must be 128-byte aligned) */
+    volatile uint32_t *vtor = (volatile uint32_t *)0xE000ED08U;
 
     if (entry_point == 0U) {
         signal_verification_failure();
@@ -332,6 +341,7 @@ static void jump_to_application(uint32_t entry_point)
     app_msp = app_vectors[0];
     app_reset = app_vectors[1];
 
+    *vtor = entry_point;
     __asm volatile(
         "msr msp, %0\n"
         "bx   %1\n"
@@ -339,15 +349,38 @@ static void jump_to_application(uint32_t entry_point)
     );
 }
 
+/**
+ * Verify application signature and jump to application.
+ * On boards with PKA (e.g. STM32L5/U5) you can replace the software ECDSA
+ * verify with: if (HAL_PKA_VerifySignature(&hpka, &sig_params) == HAL_OK) { ... }
+ * On STM32H743 there is no PKA; we use HAL_HASH (SHA-256) + mbedTLS ECDSA (or stub).
+ */
+static bool verify_signature_and_ready_to_jump(void)
+{
+    if (!verify_signature()) {
+        /* LCD_Print("AUTH FAILED!");  -- if bootloader has I2C LCD */
+        return false;
+    }
+    /* LCD_Print("Signature OK!");  -- if bootloader has I2C LCD */
+    return true;
+}
+
 int main(void)
 {
     const image_header_t *hdr = (const image_header_t *)IMAGE_HEADER_ADDRESS;
+
+    /* LED1 already on from startup; ensure it stays on (and short delay for visibility after reset) */
+    RCC_AHB4ENR |= RCC_AHB4ENR_GPIOBEN;
+    GPIOB_MODER = (GPIOB_MODER & ~(3U << (LED1_PIN * 2U))) | (1U << (LED1_PIN * 2U));
+    GPIOB_BSRR = (1U << LED1_PIN);
+    for (volatile uint32_t d = 0U; d < 2000000U; d++) { (void)d; }
 
     log_init();
     log_puts("[boot] Secure bootloader\r\n");
     log_puts("[boot] UART 115200 OK\r\n");
 
-    if (!verify_signature()) {
+    /* Check signature before jump (concept: HAL_PKA_VerifySignature on boards with PKA). */
+    if (!verify_signature_and_ready_to_jump()) {
         log_puts("[boot] Signature FAIL, halt\r\n");
         signal_verification_failure();
     }

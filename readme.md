@@ -4,13 +4,25 @@
 
 **Подробная инструкция по сборке и прошивке:** [docs/BUILD_RU.md](docs/BUILD_RU.md)
 
+**Verified Boot на STM32 (терминология и концепции):** [docs/VERIFIED_BOOT_STM32_RU.md](docs/VERIFIED_BOOT_STM32_RU.md)
+
+**Использование примеров для тестирования:** [docs/TESTING_RU.md](docs/TESTING_RU.md)
+
+**Интерактивная отладка (GDB + st-util):** [docs/DEBUG_RU.md](docs/DEBUG_RU.md)
+
+**Эмуляция в Renode (без платы):** [docs/SIMULATE_RU.md](docs/SIMULATE_RU.md)
+
+**Что нужно для создания/прошивки образа под STM32 (наш проект и официальные ST):** [docs/WHAT_NEEDED_STM32_RU.md](docs/WHAT_NEEDED_STM32_RU.md)
+
+**Быстрый старт X-CUBE-SBSFU (скачать и запустить на STM32):** [docs/SBSFU_QUICKSTART_RU.md](docs/SBSFU_QUICKSTART_RU.md)
+
 Быстрый старт:
 ```bash
 make
 make -f app/Makefile all
-source scripts/venv/bin/activate && python scripts/sign_image.py build_app/app.bin build_app/signed_app.bin
-st-flash write build/bootloader.bin 0x08000000
-st-flash write build_app/signed_app.bin 0x08010000
+source scripts/venv/bin/activate && python scripts/sign_image.py build/app/app.bin build/app/signed_app.bin
+st-flash write build/bootloader/bootloader.bin 0x08000000
+st-flash write build/app/signed_app.bin 0x08010000
 ```
 
 --- СКОПИРУЙ ЭТО В СВОЙ C-КОД (bootloader/inc/keys.h) ---

@@ -38,6 +38,19 @@ g_pfnVectors:
 Reset_Handler:
     ldr r0, =_estack
     msr msp, r0
+    /* LED2 (PE1) on immediately so we see we entered the app (bootloader uses LED1) */
+    ldr r0, =0x58024400
+    ldr r1, [r0, #0xE0]
+    orr r1, r1, #(1 << 4)
+    str r1, [r0, #0xE0]
+    ldr r0, =0x58021000
+    ldr r1, [r0, #0]
+    bic r1, r1, #(3 << 2)
+    orr r1, r1, #(1 << 2)
+    str r1, [r0, #0]
+    mov r1, #(1 << 1)
+    str r1, [r0, #0x18]
+
     ldr r0, =_sbss
     ldr r1, =_ebss
     b 2f
@@ -65,8 +78,14 @@ HardFault_Handler:
 MemManage_Handler:
 BusFault_Handler:
 UsageFault_Handler:
-SVC_Handler:
 DebugMon_Handler:
+    b .
+
+.weak SVC_Handler
+.weak PendSV_Handler
+.weak SysTick_Handler
+.thumb_func
+SVC_Handler:
 PendSV_Handler:
 SysTick_Handler:
     b .

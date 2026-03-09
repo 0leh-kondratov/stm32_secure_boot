@@ -12,63 +12,72 @@ SIZE    = arm-none-eabi-size
 CFLAGS  = -mcpu=cortex-m7 -mthumb -std=c11 -Wall -Wextra -O2 -ffunction-sections -fdata-sections -fno-builtin
 CFLAGS += -DUSE_ECDSA_STUB
 CFLAGS += -I bootloader/inc -I common
-LDFLAGS = -T bootloader/bootloader.ld -nostdlib -Wl,--gc-sections -Wl,-Map=bootloader/bootloader.map
+BUILD   = build/bootloader
+LDFLAGS = -T bootloader/bootloader.ld -nostdlib -Wl,--gc-sections -Wl,-Map=$(BUILD)/bootloader.map
+
+# Debug build for GDB: -g -O0 (make -f bootloader/Makefile debug)
+# debug-clean: пересобрать с нуля с отладочными символами
+debug: CFLAGS += -g -O0
+debug: all
+
+debug-clean: clean
+	$(MAKE) debug
 
 BOOTLOADER_SRC = bootloader/src/main.c common/uart_log.c
 BOOTLOADER_ASM = bootloader/startup_stm32h743xx.s
 # Use USART3 (PD8/PD9) for debug log — ST-Link VCP on NUCLEO-H743ZI2
-BOOTLOADER_OBJ = build/bootloader_main.o build/uart_log_usart3.o build/startup_stm32h743xx.o
+BOOTLOADER_OBJ = $(BUILD)/bootloader_main.o $(BUILD)/uart_log_usart3.o $(BUILD)/startup_stm32h743xx.o
 
-all: build/bootloader.elf build/bootloader.bin
+all: $(BUILD)/bootloader.elf $(BUILD)/bootloader.bin
 
-build:
-	@mkdir -p build
+$(BUILD):
+	@mkdir -p $(BUILD)
 
-build/bootloader_main.o: bootloader/src/main.c | build
+$(BUILD)/bootloader_main.o: bootloader/src/main.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-build/startup_stm32h743xx.o: bootloader/startup_stm32h743xx.s | build
+$(BUILD)/startup_stm32h743xx.o: bootloader/startup_stm32h743xx.s | $(BUILD)
 	$(CC) -mcpu=cortex-m7 -mthumb -c -o $@ $<
 
-build/uart_log.o: common/uart_log.c | build
+$(BUILD)/uart_log.o: common/uart_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-build/uart_log_usart3.o: common/uart_log.c | build
+$(BUILD)/uart_log_usart3.o: common/uart_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -DUART_LOG_USE_USART3 -c -o $@ $<
 
-build/bootloader.elf: $(BOOTLOADER_OBJ)
+$(BUILD)/bootloader.elf: $(BOOTLOADER_OBJ)
 	$(LD) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 	$(SIZE) $@
 
-build/bootloader.bin: build/bootloader.elf
+$(BUILD)/bootloader.bin: $(BUILD)/bootloader.elf
 	$(OBJCOPY) -O binary $< $@
 
 # Minimal bootloader: only UART log test (no signature, no jump to app)
-MINIMAL_OBJ = build/bootloader_minimal_main.o build/uart_log.o build/startup_stm32h743xx.o
+MINIMAL_OBJ = $(BUILD)/bootloader_minimal_main.o $(BUILD)/uart_log.o $(BUILD)/startup_stm32h743xx.o
 
-build/bootloader_minimal_main.o: bootloader/src/main_minimal.c | build
+$(BUILD)/bootloader_minimal_main.o: bootloader/src/main_minimal.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-build/bootloader_minimal.elf: $(MINIMAL_OBJ)
+$(BUILD)/bootloader_minimal.elf: $(MINIMAL_OBJ)
 	$(LD) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 	$(SIZE) $@
 
-build/bootloader_minimal.bin: build/bootloader_minimal.elf
+$(BUILD)/bootloader_minimal.bin: $(BUILD)/bootloader_minimal.elf
 	$(OBJCOPY) -O binary $< $@
 
-minimal: build/bootloader_minimal.bin
+minimal: $(BUILD)/bootloader_minimal.bin
 
 # Minimal bootloader with USART3 (PD8/PD9) for boards where VCP is on USART3
-build/bootloader_minimal_usart3.elf: build/bootloader_minimal_main.o build/uart_log_usart3.o build/startup_stm32h743xx.o
+$(BUILD)/bootloader_minimal_usart3.elf: $(BUILD)/bootloader_minimal_main.o $(BUILD)/uart_log_usart3.o $(BUILD)/startup_stm32h743xx.o
 	$(LD) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 	$(SIZE) $@
 
-build/bootloader_minimal_usart3.bin: build/bootloader_minimal_usart3.elf
+$(BUILD)/bootloader_minimal_usart3.bin: $(BUILD)/bootloader_minimal_usart3.elf
 	$(OBJCOPY) -O binary $< $@
 
-minimal-usart3: build/bootloader_minimal_usart3.bin
+minimal-usart3: $(BUILD)/bootloader_minimal_usart3.bin
 
 clean:
-	rm -rf build
+	rm -rf $(BUILD)
 
-.PHONY: all clean minimal minimal-usart3
+.PHONY: all clean minimal minimal-usart3 debug debug-clean

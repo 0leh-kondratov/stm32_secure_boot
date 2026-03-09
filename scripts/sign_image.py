@@ -17,7 +17,7 @@ from ecdsa import SigningKey, NIST256p
 
 IMAGE_HEADER_MAGIC = 0x424F4F54  # 'BOOT'
 IMAGE_HEADER_ADDRESS = 0x08010000
-APP_ENTRY_POINT = 0x08010060  # Vector table after 96-byte header
+APP_ENTRY_POINT = 0x08010080  # 128-byte aligned for VTOR (header 96 + pad 32)
 HEADER_SIZE = 96  # sizeof(image_header_t)
 
 

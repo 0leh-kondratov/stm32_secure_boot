@@ -10,3 +10,6 @@
    Результат: build_demo/demo.bin
    Прошивка: st-flash write build_demo/demo.bin 0x08000000
    UART: USART3 (PD8/PD9), 115200 8N1. В логе: LED1=ON/OFF и т.д.
+
+   Эмуляция в Renode: make demo && renode demo.resc (из корня проекта).
+   Лог — окно usart3. GDB: порт 3334.

@@ -1,6 +1,6 @@
-# Build outputs
+# Build outputs (all targets under build/)
 build/
-build_app/
+config-copied
 *.o
 *.elf
 *.bin
@@ -28,6 +28,9 @@ scripts/root_private_key.pem
 # OS
 .DS_Store
 Thumbs.db
+
+# Downloaded installers / binaries
+*.deb
 
 # Optional: uncomment if you add mbedTLS as submodule or copy
 # third_party/mbedtls/

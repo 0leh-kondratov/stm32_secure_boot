@@ -1,0 +1,40 @@
+# demo.resc — эмуляция standalone demo (3 LED + UART) на STM32H743 в Renode
+#
+# Проверка эмуляции на простом рабочем образе без бутлоадера и подписи.
+#
+# Запуск из корня проекта:
+#   make demo
+#   renode demo.resc
+#
+# В окне usart3: Demo: LEDs + log (NUCLEO-H743ZI2), LED1=ON/OFF ...
+#
+# --- GDB ---
+# Подключение во втором терминале:
+#   arm-none-eabi-gdb build/demo/demo.elf
+#   (gdb) target remote :3334
+#   (gdb) break main
+#   (gdb) continue
+# Или в Cursor: запустить renode demo.resc, затем F5 → конфигурация "Debug demo (Renode)".
+#
+# --- Состояние LED в Renode ---
+# 1) В окне usart3 уже идёт лог: LED1=ON LED2=OFF LED3=OFF и т.д.
+# 2) В мониторе Renode (ввод в консоли) можно прочитать GPIO Output Data Register:
+#    (machine-0) sysbus ReadDoubleWord 0x58020414
+#    → GPIOB ODR: бит 0 = LED1 (PB0), бит 14 = LED3 (PB14); 1 = горит
+#    (machine-0) sysbus ReadDoubleWord 0x58021014
+#    → GPIOE ODR: бит 1 = LED2 (PE1); 1 = горит
+#    Вывод: если (value & 1) != 0 то LED1 on, (value & (1<<14)) то LED3 on, и т.д.
+
+using sysbus
+mach create "stm32h7"
+machine LoadPlatformDescription @platforms/cpus/stm32h743.repl
+
+# Standalone demo по 0x08000000 (тот же образ, что прошивается на плату без бутлоадера)
+sysbus LoadELF @build/demo/demo.elf
+
+showAnalyzer usart3
+
+# GDB-сервер на порту 3334 — подключиться: (gdb) target remote :3334
+machine StartGdbServer 3334
+
+start

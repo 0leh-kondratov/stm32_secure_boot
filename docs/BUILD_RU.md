@@ -90,7 +90,7 @@ make -f bootloader/Makefile all
 
 Результат:
 - `build/bootloader.elf` — образ для отладки;
-- `build/bootloader.bin` — бинарник для прошивки в область 0x08000000.
+- `build/bootloader/bootloader.bin` — бинарник для прошивки в область 0x08000000.
 
 По умолчанию включён **режим stub** (макрос `USE_ECDSA_STUB`): подпись не проверяется, любой образ считается «верным». Так можно быстро проверить цепочку: бутлоадер → переход в приложение. Для настоящей проверки подписи нужна сборка с mbedTLS (см. раздел 7).
 
@@ -102,7 +102,7 @@ make -f bootloader/Makefile all
 make -f app/Makefile all
 ```
 
-Результат: `build_app/app.bin` — сырой образ приложения (без заголовка), скомпилированный для адреса 0x08010060.
+Результат: `build/app/app.bin` — сырой образ приложения (без заголовка), скомпилированный для адреса 0x08010060.
 
 ---
 
@@ -112,7 +112,7 @@ make -f app/Makefile all
 
 ```bash
 source scripts/venv/bin/activate
-python scripts/sign_image.py build_app/app.bin build_app/signed_app.bin
+python scripts/sign_image.py build/app/app.bin build/app/signed_app.bin
 ```
 
 Файл `scripts/root_private_key.pem` должен существовать (если ключей ещё нет — см. `scripts/generate_keys.py` и обновите `bootloader/inc/keys.h` открытым ключом).
@@ -124,11 +124,11 @@ python scripts/sign_image.py build_app/app.bin build_app/signed_app.bin
 1. Подключите NUCLEO-144 по USB.
 2. Записать бутлоадер по адресу 0x08000000:
    ```bash
-   st-flash write build/bootloader.bin 0x08000000
+   st-flash write build/bootloader/bootloader.bin 0x08000000
    ```
 3. Записать подписанное приложение по адресу 0x08010000:
    ```bash
-   st-flash write build_app/signed_app.bin 0x08010000
+   st-flash write build/app/signed_app.bin 0x08010000
    ```
 
 Либо одной командой (сначала бутлоадер, потом приложение в один объединённый файл — можно подготовить отдельным скриптом).
@@ -180,7 +180,7 @@ python scripts/sign_image.py build_app/app.bin build_app/signed_app.bin
    ```
 2. Прошейте его по адресу 0x08000000:
    ```bash
-   st-flash write build/bootloader_minimal.bin 0x08000000
+   st-flash write build/bootloader/bootloader_minimal.bin 0x08000000
    ```
 3. Откройте терминал 115200 8N1 и нажмите Reset. Должны появиться строки:
    ```
@@ -198,11 +198,11 @@ python scripts/sign_image.py build_app/app.bin build_app/signed_app.bin
   ```bash
   make demo
   ```
-  Результат: `build_demo/demo.bin`.
+  Результат: `build/demo/demo.bin`.
 
 - **Прошивка** (образ записывается с 0x08000000, бутлоадер не используется):
   ```bash
-  st-flash write build_demo/demo.bin 0x08000000
+  st-flash write build/demo/demo.bin 0x08000000
   ```
 
 - **UART:** USART3 (PD8/PD9), 115200 8N1 — тот же виртуальный COM порт ST-Link. В логе по очереди строки вида:
@@ -251,8 +251,8 @@ python scripts/sign_image.py build_app/app.bin build_app/signed_app.bin
 1. Установить `arm-none-eabi-gcc`, активировать `scripts/venv`, при необходимости установить `st-link`.
 2. Собрать бутлоадер: `make`.
 3. Собрать приложение: `make -f app/Makefile all`.
-4. Подписать образ: `python scripts/sign_image.py build_app/app.bin build_app/signed_app.bin`.
-5. Прошить: `st-flash write build/bootloader.bin 0x08000000`, затем `st-flash write build_app/signed_app.bin 0x08010000`.
+4. Подписать образ: `python scripts/sign_image.py build/app/app.bin build/app/signed_app.bin`.
+5. Прошить: `st-flash write build/bootloader/bootloader.bin 0x08000000`, затем `st-flash write build/app/signed_app.bin 0x08010000`.
 6. Сбросить плату — должно мигать зелёным (приложение запустилось после бутлоадера).
 
 Если что-то не собирается или не прошивается — пришлите текст ошибки и вывод команд.

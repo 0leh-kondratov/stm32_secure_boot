@@ -5,6 +5,10 @@
  */
 #include <stdint.h>
 #include "uart_log.h"
+#ifdef UART_LOG_FREERTOS_YIELD
+#include "FreeRTOS.h"
+#include "task.h"
+#endif
 
 #ifdef USE_HAL_DRIVER
 #include "stm32h7xx_hal.h"
@@ -13,6 +17,8 @@
 #define RCC_BASE            (0x58024400UL)
 #define RCC_AHB4ENR         (*(volatile uint32_t *)(RCC_BASE + 0xE0U))
 #define RCC_APB1LENR        (*(volatile uint32_t *)(RCC_BASE + 0x58U))
+#define RCC_D2CFGR          (*(volatile uint32_t *)(RCC_BASE + 0x94U))
+#define RCC_D2CCIP2R        (*(volatile uint32_t *)(RCC_BASE + 0x54U))
 
 #define USART_CR1_UE        (1U << 0)
 #define USART_CR1_TE        (1U << 3)
@@ -62,6 +68,10 @@ static void delay_loop(uint32_t n)
 
 void log_init(void)
 {
+#if defined(DEMO_USE_SYSTEM_CLOCK)
+    /* USART2/3 clock source = PCLK1 (0 = PCLK1). Required for correct baud on H7. */
+    RCC_D2CCIP2R &= ~0x07U;
+#endif
     RCC_AHB4ENR |= RCC_AHB4ENR_GPIOXEN;
     RCC_APB1LENR |= RCC_APB1LENR_UARTEN;
 
@@ -74,11 +84,22 @@ void log_init(void)
 #endif
 
     uint32_t brr = UART_BRR_FALLBACK_115200_AT_64MHZ;
+#define UART_DIV_115200_16X  (16U * 115200U)  /* 1843200: BRR = PCLK1 / this */
 #ifdef USE_HAL_DRIVER
     /* USART2/3 are on APB1. After SystemClock_Config(), HAL knows the real PCLK1. */
     uint32_t pclk1 = HAL_RCC_GetPCLK1Freq();
     if (pclk1 != 0U) {
-        brr = (pclk1 + (115200U / 2U)) / 115200U; /* rounded */
+        brr = (pclk1 + (UART_DIV_115200_16X / 2U)) / UART_DIV_115200_16X;
+        if (brr == 0U) brr = 1U;
+    }
+#elif defined(DEMO_USE_SYSTEM_CLOCK)
+    /* Demo/Test with system_stm32h7xx: PCLK1 = SystemD2Clock / D2PPRE1. */
+    extern uint32_t SystemD2Clock;
+    uint32_t d2ppre1 = (RCC_D2CFGR >> 8U) & 7U;
+    if (d2ppre1 > 4U) d2ppre1 = 4U;
+    uint32_t pclk1 = SystemD2Clock >> d2ppre1;
+    if (pclk1 != 0U) {
+        brr = (pclk1 + (UART_DIV_115200_16X / 2U)) / UART_DIV_115200_16X;
         if (brr == 0U) brr = 1U;
     }
 #endif
@@ -96,12 +117,34 @@ int log_getchar(void)
     return (int)(UART_RDR & 0xFFU);
 }
 
+/* Таймаут ожидания TXE (циклов), чтобы не зависать в Renode, если эмулятор не сбрасывает TXE */
+#define LOG_PUTS_TX_TIMEOUT  50000
+/* При UART_LOG_FREERTOS_YIELD при таймауте делаем vTaskDelay(1) и повторяем — даём эмулятору время и не блокируем шелл */
+#ifdef UART_LOG_FREERTOS_YIELD
+#define LOG_PUTS_RETRIES    150
+#endif
+
 void log_puts(const char *s)
 {
     if (!s) return;
     while (*s) {
-        while ((UART_ISR & USART_ISR_TXE) == 0)
-            ;
+        uint32_t n = LOG_PUTS_TX_TIMEOUT;
+        while ((UART_ISR & USART_ISR_TXE) == 0 && n != 0)
+            n--;
+#ifdef UART_LOG_FREERTOS_YIELD
+        if (n == 0) {
+            unsigned r = LOG_PUTS_RETRIES;
+            while (r != 0 && (UART_ISR & USART_ISR_TXE) == 0) {
+                vTaskDelay(pdMS_TO_TICKS(1));
+                r--;
+            }
+            if (r == 0)
+                break;
+        }
+#else
+        if (n == 0)
+            break; /* не блокируемся навсегда (например в Renode) */
+#endif
         UART_TDR = (uint32_t)(unsigned char)*s++;
     }
 }

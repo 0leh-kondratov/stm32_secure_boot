@@ -213,7 +213,7 @@ python scripts/sign_image.py build/app/app.bin build/app/signed_app.bin
   LED1=OFF LED2=OFF LED3=ON
   ```
 
-Подробнее: `demo/README`.
+Подробнее: `app/demo/README`.
 
 ### Официальная прошивка для проверки UART (опционально)
 

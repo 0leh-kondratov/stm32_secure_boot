@@ -42,20 +42,21 @@ static void leds_init(void)
     GPIOE_MODER |= (1U << (LED2_PIN * 2));
 }
 
+/* NUCLEO LEDs are active-low: low = ON, high = OFF */
 static void led1_set(int on)
 {
-    if (on) GPIOB_BSRR = (1U << LED1_PIN);
-    else    GPIOB_BSRR = (1U << (LED1_PIN + 16U));
+    if (on) GPIOB_BSRR = (1U << (LED1_PIN + 16U));
+    else    GPIOB_BSRR = (1U << LED1_PIN);
 }
 static void led2_set(int on)
 {
-    if (on) GPIOE_BSRR = (1U << LED2_PIN);
-    else    GPIOE_BSRR = (1U << (LED2_PIN + 16U));
+    if (on) GPIOE_BSRR = (1U << (LED2_PIN + 16U));
+    else    GPIOE_BSRR = (1U << LED2_PIN);
 }
 static void led3_set(int on)
 {
-    if (on) GPIOB_BSRR = (1U << LED3_PIN);
-    else    GPIOB_BSRR = (1U << (LED3_PIN + 16U));
+    if (on) GPIOB_BSRR = (1U << (LED3_PIN + 16U));
+    else    GPIOB_BSRR = (1U << LED3_PIN);
 }
 
 static void log_led_state(int l1, int l2, int l3)

@@ -1,8 +1,6 @@
 # Step 1: Hardware Baseline — I2C1 (PB8/PB9) + LCD 1602. No FreeRTOS.
 # Run from project root: make step1   → build/step1/step1.bin
-# Flash: st-flash write build/step1/step1.bin 0x08000000
-
-TOP      := $(dir $(lastword $(MAKEFILE_LIST)))..
+TOP      ?= $(CURDIR)
 CUBE_ROOT ?= $(abspath $(TOP)/../STM32CubeH7)
 
 CC       = arm-none-eabi-gcc
@@ -19,7 +17,7 @@ CFLAGS  += -I$(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Inc
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy
 CFLAGS  += -I$(CUBE_ROOT)/Projects/NUCLEO-H743ZI/Templates/Inc
 
-LDFLAGS  = -T$(TOP)/demo/demo.ld -nostdlib -Wl,--gc-sections -lgcc -specs=nosys.specs -lc
+LDFLAGS  = -T$(TOP)/app/demo/demo.ld -nostdlib -Wl,--gc-sections -lgcc -specs=nosys.specs -lc
 
 BUILD    = build/step1
 HAL_SRC  = $(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Src
@@ -36,7 +34,7 @@ all: $(BUILD)/step1.elf $(BUILD)/step1.bin
 $(BUILD):
 	@mkdir -p $(BUILD)
 
-$(BUILD)/main.o: $(TOP)/step1/main.c | $(BUILD)
+$(BUILD)/main.o: $(TOP)/app/step1/main.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/uart_log.o: $(TOP)/common/uart_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<

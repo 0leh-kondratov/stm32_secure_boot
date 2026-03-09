@@ -1,9 +1,9 @@
 # LwIP + FreeRTOS build for NUCLEO-H743ZI (STM32H743ZI2).
 # Requires CUBE_ROOT pointing to STM32CubeH7 with Drivers and Middlewares.
 # If Middlewares/Third_Party/LwIP or FreeRTOS are empty, copy from full Cube package.
-# Run from project root: make -f lwip/Makefile all   OR   make lwip
+# Run from project root: make lwip
 
-TOP     := $(dir $(lastword $(MAKEFILE_LIST)))..
+TOP     ?= $(CURDIR)
 CUBE_ROOT ?= $(abspath $(TOP)/../STM32CubeH7)
 
 CC      = arm-none-eabi-gcc
@@ -30,7 +30,7 @@ CFLAGS += -I$(CUBE_ROOT)/Middlewares/Third_Party/LwIP/system
 CFLAGS += -I$(CUBE_ROOT)/Middlewares/Third_Party/FreeRTOS/Source/include
 CFLAGS += -I$(CUBE_ROOT)/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2
 
-LDFLAGS = -T$(TOP)/lwip/lwip_nucleo_h743zi.ld -nostdlib -Wl,--gc-sections -lgcc -specs=nosys.specs -lc
+LDFLAGS = -T$(TOP)/app/lwip/lwip_nucleo_h743zi.ld -nostdlib -Wl,--gc-sections -lgcc -specs=nosys.specs -lc
 
 BUILD   = build/lwip
 FREERTOS_SRC = $(TOP)/FreeRTOS/Source
@@ -153,8 +153,7 @@ $(BUILD)/bsp_nucleo.o: $(BSP_SRC)/stm32h7xx_nucleo.c | $(BUILD)
 $(BUILD)/lan8742.o: $(LAN8742_SRC)/lan8742.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/lcd_1602_i2c.o: $(TOP)/common/lcd_1602_i2c.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -DUSE_HAL_DRIVER -c -o $@ $<
 
 $(BUILD)/lwip_api_lib.o: $(LWIP_API)/api_lib.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<

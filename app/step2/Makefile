@@ -1,7 +1,7 @@
 # Step 2: FreeRTOS + single DisplayTask (LCD counter every 1s). I2C1 PB8/PB9.
 # make step2 → build/step2/step2.bin
 
-TOP      := $(dir $(lastword $(MAKEFILE_LIST)))..
+TOP      ?= $(CURDIR)
 CUBE_ROOT ?= $(abspath $(TOP)/../STM32CubeH7)
 
 CC       = arm-none-eabi-gcc
@@ -17,7 +17,7 @@ CFLAGS  += -I$(CUBE_ROOT)/Drivers/CMSIS/Include -I$(CUBE_ROOT)/Drivers/CMSIS/Dev
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Inc -I$(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy
 CFLAGS  += -I$(CUBE_ROOT)/Projects/NUCLEO-H743ZI/Templates/Inc
 
-LDFLAGS  = -T$(TOP)/demo/demo.ld -nostdlib -Wl,--gc-sections -lgcc
+LDFLAGS  = -T$(TOP)/app/demo/demo.ld -nostdlib -Wl,--gc-sections -lgcc
 
 BUILD    = build/step2
 HAL_SRC  = $(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Src
@@ -27,7 +27,7 @@ FREERTOS = $(TOP)/FreeRTOS/Source
 PORT     = $(FREERTOS)/portable/GCC/ARM_CM4F
 MEMMANG  = $(FREERTOS)/portable/MemMang
 STARTUP  = $(TOP)/app/startup_stm32h743xx.s
-STEP2_CFG = $(TOP)/step2/FreeRTOSConfig.h
+STEP2_CFG = $(TOP)/app/step2/FreeRTOSConfig.h
 FREERTOS_INC = $(TOP)/FreeRTOS/Source/include
 
 OBJ = $(BUILD)/main.o $(BUILD)/uart_log.o $(BUILD)/lcd_1602_i2c.o $(BUILD)/memset.o $(BUILD)/startup.o $(BUILD)/system_stm32h7xx.o \
@@ -56,7 +56,7 @@ $(BUILD)/uart_log.o: $(TOP)/common/uart_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/lcd_1602_i2c.o: $(TOP)/common/lcd_1602_i2c.c | $(BUILD)
 	$(CC) $(CFLAGS) -DUSE_HAL_DRIVER -c -o $@ $<
-$(BUILD)/memset.o: $(TOP)/demo/memset.c | $(BUILD)
+$(BUILD)/memset.o: $(TOP)/app/demo/memset.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/startup.o: $(STARTUP) | $(BUILD)
 	$(AS) $(CFLAGS) -c -o $@ $<

@@ -71,7 +71,7 @@ arm-none-eabi-gdb build/demo/demo.elf
 ```
 
 **Как увидеть состояние LED в эмуляции:**
-1. **В окне usart3** — demo уже выводит строки `LED1=ON LED2=OFF LED3=OFF` и т.д. (функция `log_led_state` в demo/main.c).
+1. **В окне usart3** — demo уже выводит строки `LED1=ON LED2=OFF LED3=OFF` и т.д. (функция `log_led_state` в app/demo/main.c).
 2. **В мониторе Renode** (консоль, где запущен renode) можно прочитать регистр GPIO ODR (Output Data Register) — по нему видно текущий уровень на выходах:
    - `(machine-0) sysbus ReadDoubleWord 0x58020414` — **GPIOB ODR**: бит 0 = LED1 (PB0), бит 14 = LED3 (PB14); значение 1 = выход высокий (LED горит).
    - `(machine-0) sysbus ReadDoubleWord 0x58021014` — **GPIOE ODR**: бит 1 = LED2 (PE1); 1 = горит.

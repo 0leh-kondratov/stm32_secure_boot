@@ -1,7 +1,7 @@
 # Stage 2: FreeRTOS + LCD counter (Wallet Init, count every 1s). No LwIP.
 # Run from project root: make -f tests/stage2_freertos_lcd/Makefile all
 
-TOP      := $(dir $(lastword $(MAKEFILE_LIST)))../..
+TOP      ?= $(CURDIR)
 CUBE_ROOT ?= $(abspath $(TOP)/../STM32CubeH7)
 
 CC       = arm-none-eabi-gcc
@@ -11,13 +11,13 @@ AS       = arm-none-eabi-gcc -x assembler-with-cpp
 
 CFLAGS   = -mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=c11 -Wall -O2
 CFLAGS  += -DSTM32H743xx -DUSE_HAL_DRIVER -DUSE_PWR_LDO_SUPPLY -DUART_LOG_USE_USART3
-CFLAGS  += -I$(TOP)/common -I$(TOP)/tests/stage2_freertos_lcd
+CFLAGS  += -I$(TOP)/common -I$(TOP)/test/stage2_freertos_lcd
 CFLAGS  += -I$(TOP)/FreeRTOS/Source/include -I$(TOP)/FreeRTOS/Source/portable/GCC/ARM_CM4F
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/CMSIS/Include -I$(CUBE_ROOT)/Drivers/CMSIS/Device/ST/STM32H7xx/Include
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Inc -I$(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy
 CFLAGS  += -I$(CUBE_ROOT)/Projects/NUCLEO-H743ZI/Templates/Inc
 
-LDFLAGS  = -T$(TOP)/demo/demo.ld -nostdlib -Wl,--gc-sections -lgcc
+LDFLAGS  = -T$(TOP)/app/demo/demo.ld -nostdlib -Wl,--gc-sections -lgcc
 
 BUILD    = build/stage2
 HAL_SRC  = $(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Src
@@ -34,7 +34,7 @@ OBJ = $(BUILD)/main.o $(BUILD)/uart_log.o $(BUILD)/memset.o $(BUILD)/lcd_1602_i2
 
 # Use stage2's FreeRTOSConfig so we get configSUPPORT_STATIC_ALLOCATION=0, configUSE_TIMERS=0
 FREERTOS_INC = $(TOP)/FreeRTOS/Source/include
-STAGE2_CFG   = $(TOP)/tests/stage2_freertos_lcd/FreeRTOSConfig.h
+STAGE2_CFG   = $(TOP)/test/stage2_freertos_lcd/FreeRTOSConfig.h
 
 config-copied: $(STAGE2_CFG)
 	@cp "$(FREERTOS_INC)/FreeRTOSConfig.h" "$(FREERTOS_INC)/FreeRTOSConfig.h.bak" 2>/dev/null || true
@@ -52,11 +52,11 @@ all: $(BUILD)/stage2.elf $(BUILD)/stage2.bin
 $(BUILD):
 	@mkdir -p $(BUILD)
 
-$(BUILD)/main.o: $(TOP)/tests/stage2_freertos_lcd/main.c | $(BUILD)
+$(BUILD)/main.o: $(TOP)/test/stage2_freertos_lcd/main.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/uart_log.o: $(TOP)/common/uart_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
-$(BUILD)/memset.o: $(TOP)/demo/memset.c | $(BUILD)
+$(BUILD)/memset.o: $(TOP)/app/demo/memset.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/lcd_1602_i2c.o: $(TOP)/common/lcd_1602_i2c.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<

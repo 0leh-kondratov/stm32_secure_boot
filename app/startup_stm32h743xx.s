@@ -38,7 +38,7 @@ g_pfnVectors:
 Reset_Handler:
     ldr r0, =_estack
     msr msp, r0
-    /* LED2 (PE1) on immediately so we see we entered the app (bootloader uses LED1) */
+    /* LED2 (PE1) on immediately: active-low so drive low (BSRR reset bit) */
     ldr r0, =0x58024400
     ldr r1, [r0, #0xE0]
     orr r1, r1, #(1 << 4)
@@ -48,7 +48,7 @@ Reset_Handler:
     bic r1, r1, #(3 << 2)
     orr r1, r1, #(1 << 2)
     str r1, [r0, #0]
-    mov r1, #(1 << 1)
+    mov r1, #(1 << (1 + 16))
     str r1, [r0, #0x18]
 
     ldr r0, =_sbss

@@ -1,8 +1,8 @@
 # Stage 1: I2C Scanner — no FreeRTOS, HAL I2C + UART log.
-# Run from project root: make -f tests/stage1_i2c_scanner/Makefile all
-# Flash: st-flash write build/stage1/stage1.bin 0x08000000
+# Run from project root: make test-stage1
+# Flash: make flash-stage1
 
-TOP      := $(dir $(lastword $(MAKEFILE_LIST)))../..
+TOP      ?= $(CURDIR)
 CUBE_ROOT ?= $(abspath $(TOP)/../STM32CubeH7)
 
 CC       = arm-none-eabi-gcc
@@ -19,7 +19,7 @@ CFLAGS  += -I$(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Inc
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy
 CFLAGS  += -I$(CUBE_ROOT)/Projects/NUCLEO-H743ZI/Templates/Inc
 
-LDFLAGS  = -T$(TOP)/demo/demo.ld -nostdlib -Wl,--gc-sections -lgcc -specs=nosys.specs -lc
+LDFLAGS  = -T$(TOP)/app/demo/demo.ld -nostdlib -Wl,--gc-sections -lgcc -specs=nosys.specs -lc
 
 BUILD    = build/stage1
 HAL_SRC  = $(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Src
@@ -36,7 +36,7 @@ all: $(BUILD)/stage1.elf $(BUILD)/stage1.bin
 $(BUILD):
 	@mkdir -p $(BUILD)
 
-$(BUILD)/main.o: $(TOP)/tests/stage1_i2c_scanner/main.c | $(BUILD)
+$(BUILD)/main.o: $(TOP)/test/stage1_i2c_scanner/main.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/uart_log.o: $(TOP)/common/uart_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<

@@ -1,12 +1,16 @@
-# demo.resc — эмуляция standalone demo (3 LED + UART) на STM32H743 в Renode
+# demo.resc — эмуляция standalone demo (FreeRTOS, 3 LED + UART) на STM32H743 в Renode
+# Исходники: app/demo. Сборка: make demo → build/demo/demo.elf
 #
-# Проверка эмуляции на простом рабочем образе без бутлоадера и подписи.
+# Проверка эмуляции без бутлоадера и подписи. Образ тот же, что прошивается make flash-demo.
 #
 # Запуск из корня проекта:
 #   make demo
 #   renode demo.resc
+# Без GUI (вывод UART в консоль, без предупреждений GTK):
+#   renode --disable-gui demo.resc
 #
-# В окне usart3: Demo: LEDs + log (NUCLEO-H743ZI2), LED1=ON/OFF ...
+# В окне usart3: "Demo UART OK", приглашение "FreeRTOS interactive. Type 'help'.", "> " (вывод из main до старта планировщика).
+# Ввод в Renode: telnet localhost 12345 (или nc localhost 12345) — там вводить help, led3 on и т.д.
 #
 # --- GDB ---
 # Подключение во втором терминале:
@@ -17,22 +21,33 @@
 # Или в Cursor: запустить renode demo.resc, затем F5 → конфигурация "Debug demo (Renode)".
 #
 # --- Состояние LED в Renode ---
-# 1) В окне usart3 уже идёт лог: LED1=ON LED2=OFF LED3=OFF и т.д.
-# 2) В мониторе Renode (ввод в консоли) можно прочитать GPIO Output Data Register:
+# 1) В окне usart3 идёт лог: LED1=ON LED2=OFF LED3=OFF и т.д.
+# 2) LED на NUCLEO active-low: в ODR 0 = горит, 1 = погашен.
 #    (machine-0) sysbus ReadDoubleWord 0x58020414
-#    → GPIOB ODR: бит 0 = LED1 (PB0), бит 14 = LED3 (PB14); 1 = горит
+#    → GPIOB ODR: бит 0 = LED1 (PB0), бит 14 = LED3 (PB14)
 #    (machine-0) sysbus ReadDoubleWord 0x58021014
-#    → GPIOE ODR: бит 1 = LED2 (PE1); 1 = горит
-#    Вывод: если (value & 1) != 0 то LED1 on, (value & (1<<14)) то LED3 on, и т.д.
+#    → GPIOE ODR: бит 1 = LED2 (PE1)
+#    LED включён, если соответствующий бит ODR == 0.
+#
+# Лог Renode: 0=Noisy, 1=Debug, 2=Info, 3=Warning, 4=Error, 5=NoLog.
+# logLevel 4 — только ошибки; скрывает WARNING (rcc, 0x2007FFxx, FMC, GPV).
+# Для отладки: logLevel 0 или 1.
 
 using sysbus
+logLevel 4
 mach create "stm32h7"
 machine LoadPlatformDescription @platforms/cpus/stm32h743.repl
 
 # Standalone demo по 0x08000000 (тот же образ, что прошивается на плату без бутлоадера)
 sysbus LoadELF @build/demo/demo.elf
 
+# Вывод в окно Renode
 showAnalyzer usart3
+
+# Ввод с клавиатуры: сокет-терминал на порту 12345. Подключиться: telnet localhost 12345 (или nc localhost 12345)
+# Тогда ввод (help, led3 on и т.д.) попадёт в эмулированный UART.
+emulation CreateServerSocketTerminal 12345 "uart_term" false
+connector Connect sysbus.usart3 uart_term
 
 # GDB-сервер на порту 3334 — подключиться: (gdb) target remote :3334
 machine StartGdbServer 3334

@@ -15,7 +15,7 @@
 | ECDSA (подпись) | `stm32h7xx_hal_pka.c` | **Примечание:** в стандартном HAL для STM32H743 драйвера PKA нет (PKA есть на L5/U5 и др.). Для H743 подпись верифицируется через mbedTLS в bootloader. Если используете плату с PKA — добавьте этот файл. |
 | SHA-256 | `stm32h7xx_hal_hash.c` | Целостность образа (bootloader и/или app) |
 
-Дополнительно для HAL (уже используются в lwip/Makefile):
+Дополнительно для HAL (уже используются в app/lwip/Makefile):
 
 - `stm32h7xx_hal.c`, `stm32h7xx_hal_cortex.c`, `stm32h7xx_hal_dma.c`, `stm32h7xx_hal_eth.c`, `stm32h7xx_hal_exti.c`, `stm32h7xx_hal_flash.c`, `stm32h7xx_hal_gpio.c`, `stm32h7xx_hal_pwr.c`, `stm32h7xx_hal_rcc.c`, `stm32h7xx_hal_tim.c`, `stm32h7xx_hal_uart.c`
 - Legacy/Ex: `stm32h7xx_hal_rcc_ex.c`, `stm32h7xx_hal_pwr_ex.c`, `stm32h7xx_hal_uart_ex.c`, `stm32h7xx_hal_tim_ex.c`, `stm32h7xx_hal_flash_ex.c`
@@ -69,4 +69,4 @@ FREERTOS_DIR = $(CUBE_ROOT)/Middlewares/Third_Party/FreeRTOS
 MBEDTLS_DIR  = $(CUBE_ROOT)/Middlewares/Third_Party/mbedTLS
 ```
 
-В **lwip/Makefile** уже подключены HAL (eth, uart, tim, dma, …), BSP Nucleo, LwIP и FreeRTOS. Для полной Application добавьте в тот же (или отдельный) Makefile: `stm32h7xx_hal_i2c.c`, `stm32h7xx_hal_hash.c`, драйвер LCD 1602, задачу `lcd_monitor_task`, при необходимости mbedTLS и объекты HTTPS-сервера.
+В **app/lwip/Makefile** уже подключены HAL (eth, uart, tim, dma, …), BSP Nucleo, LwIP и FreeRTOS. Для полной Application добавьте в тот же (или отдельный) Makefile: `stm32h7xx_hal_i2c.c`, `stm32h7xx_hal_hash.c`, драйвер LCD 1602, задачу `lcd_monitor_task`, при необходимости mbedTLS и объекты HTTPS-сервера.

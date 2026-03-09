@@ -31,7 +31,11 @@
 static volatile int led1_manual, led2_manual;
 static volatile int led1_override, led2_override;
 
+#ifndef DEMO_USE_SYSTEM_CLOCK
 uint32_t SystemCoreClock = 64000000UL;
+#else
+extern uint32_t SystemCoreClock;
+#endif
 
 extern void xPortSysTickHandler(void);
 void SysTick_Handler(void)
@@ -48,20 +52,21 @@ static void leds_init(void)
     GPIOE_MODER |= (1U << (LED2_PIN * 2));
 }
 
+/* NUCLEO LEDs are active-low: low = ON, high = OFF */
 static void led1_set(int on)
 {
-    if (on) GPIOB_BSRR = (1U << LED1_PIN);
-    else    GPIOB_BSRR = (1U << (LED1_PIN + 16U));
+    if (on) GPIOB_BSRR = (1U << (LED1_PIN + 16U));
+    else    GPIOB_BSRR = (1U << LED1_PIN);
 }
 static void led2_set(int on)
 {
-    if (on) GPIOE_BSRR = (1U << LED2_PIN);
-    else    GPIOE_BSRR = (1U << (LED2_PIN + 16U));
+    if (on) GPIOE_BSRR = (1U << (LED2_PIN + 16U));
+    else    GPIOE_BSRR = (1U << LED2_PIN);
 }
 static void led3_set(int on)
 {
-    if (on) GPIOB_BSRR = (1U << LED3_PIN);
-    else    GPIOB_BSRR = (1U << (LED3_PIN + 16U));
+    if (on) GPIOB_BSRR = (1U << (LED3_PIN + 16U));
+    else    GPIOB_BSRR = (1U << LED3_PIN);
 }
 
 static void task_led1(void *pv)
@@ -105,36 +110,49 @@ static int str_prefix(const char *line, const char *cmd)
     return 0;
 }
 
+/* После префикса "ledX" пропустить пробелы и проверить "on"/"off". Возвращает 1=on, 0=off, -1=нет. */
+static int led_arg(const char *p)
+{
+    while (*p == ' ' || *p == '\t') p++;
+    if (str_prefix(p, "on"))  return 1;
+    if (str_prefix(p, "off")) return 0;
+    return -1;
+}
+
 static void run_cmd(char *line)
 {
     size_t i = 0;
     while (line[i] && line[i] != '\r' && line[i] != '\n') i++;
     line[i] = '\0';
-    while (*line == ' ') line++;
+    while (*line == ' ' || *line == '\t' || *line == '\r' || *line == '\n') line++;
     if (!*line) return;
 
     if (str_prefix(line, "help")) {
-        log_puts("help        - this text\r\n");
-        log_puts("led1 on|off - LED1 manual (off = auto)\r\n");
-        log_puts("led2 on|off - LED2 manual\r\n");
-        log_puts("led3 on|off - LED3 on/off\r\n");
-        log_puts("status      - LED state\r\n");
+        log_puts("help, led1/led2/led3 on|off, status\r\n");
         return;
     }
     if (str_prefix(line, "status")) {
-        log_puts("LED1="); log_puts((GPIOB_ODR & (1U << LED1_PIN)) ? "ON " : "OFF ");
-        log_puts(" LED2="); log_puts((GPIOE_ODR & (1U << LED2_PIN)) ? "ON " : "OFF ");
-        log_puts(" LED3="); log_puts((GPIOB_ODR & (1U << LED3_PIN)) ? "ON\r\n" : "OFF\r\n");
+        /* active-low: ODR 0 = LED on */
+        log_puts("LED1="); log_puts((GPIOB_ODR & (1U << LED1_PIN)) ? "OFF " : "ON ");
+        log_puts(" LED2="); log_puts((GPIOE_ODR & (1U << LED2_PIN)) ? "OFF " : "ON ");
+        log_puts(" LED3="); log_puts((GPIOB_ODR & (1U << LED3_PIN)) ? "OFF\r\n" : "ON\r\n");
         return;
     }
-    if (str_prefix(line, "led1 on"))  { led1_manual = 1; led1_override = 1; log_puts("LED1 on\r\n"); return; }
-    if (str_prefix(line, "led1 off")) { led1_manual = 1; led1_override = 0; log_puts("LED1 off\r\n"); return; }
-    if (str_prefix(line, "led1"))     { led1_manual = 0; log_puts("LED1 auto\r\n"); return; }
-    if (str_prefix(line, "led2 on"))  { led2_manual = 1; led2_override = 1; log_puts("LED2 on\r\n"); return; }
-    if (str_prefix(line, "led2 off")) { led2_manual = 1; led2_override = 0; log_puts("LED2 off\r\n"); return; }
-    if (str_prefix(line, "led2"))     { led2_manual = 0; log_puts("LED2 auto\r\n"); return; }
-    if (str_prefix(line, "led3 on"))  { led3_set(1); log_puts("LED3 on\r\n"); return; }
-    if (str_prefix(line, "led3 off")) { led3_set(0); log_puts("LED3 off\r\n"); return; }
+    if (str_prefix(line, "led1")) {
+        int a = led_arg(line + 4);
+        if (a >= 0) { led1_manual = 1; led1_override = a; log_puts(a ? "LED1 on\r\n" : "LED1 off\r\n"); return; }
+        led1_manual = 0; log_puts("LED1 auto\r\n"); return;
+    }
+    if (str_prefix(line, "led2")) {
+        int a = led_arg(line + 4);
+        if (a >= 0) { led2_manual = 1; led2_override = a; log_puts(a ? "LED2 on\r\n" : "LED2 off\r\n"); return; }
+        led2_manual = 0; log_puts("LED2 auto\r\n"); return;
+    }
+    if (str_prefix(line, "led3")) {
+        int a = led_arg(line + 4);
+        if (a >= 0) { led3_set(a); log_puts(a ? "LED3 on\r\n" : "LED3 off\r\n"); return; }
+        log_puts("led3 on|off\r\n"); return;
+    }
     log_puts("? type help\r\n");
 }
 
@@ -143,7 +161,7 @@ static void task_shell(void *pv)
     char buf[LINE_MAX];
     int len = 0;
     (void)pv;
-    log_puts("\r\nFreeRTOS interactive. Type 'help'.\r\n> ");
+    /* Приглашение уже выведено из main(); здесь только цикл ввода */
     for (;;) {
         int c = log_getchar();
         if (c >= 0) {
@@ -160,15 +178,26 @@ static void task_shell(void *pv)
     }
 }
 
+#ifdef DEMO_USE_SYSTEM_CLOCK
+extern void SystemInit(void);
+extern void SystemCoreClockUpdate(void);
+#endif
+
 int main(void)
 {
+#ifdef DEMO_USE_SYSTEM_CLOCK
+    SystemInit();
+    SystemCoreClockUpdate();
+#endif
     leds_init();
     led3_set(1);
     log_init();
+    log_puts("Demo UART OK\r\n");
+    log_puts("\r\nFreeRTOS interactive. Type 'help'.\r\n> ");
 
     xTaskCreate(task_led1, "L1", configMINIMAL_STACK_SIZE * 2, NULL, 1, NULL);
     xTaskCreate(task_led2, "L2", configMINIMAL_STACK_SIZE * 2, NULL, 1, NULL);
-    xTaskCreate(task_shell, "SH", configMINIMAL_STACK_SIZE * 4, NULL, 2, NULL);
+    xTaskCreate(task_shell, "SH", configMINIMAL_STACK_SIZE * 6, NULL, 2, NULL);
 
     vTaskStartScheduler();
     for (;;) { }

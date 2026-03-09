@@ -15,7 +15,7 @@
 
 - **HAL:** `stm32h7xx_hal_eth.c`, `stm32h7xx_hal_i2c.c`, `stm32h7xx_hal_hash.c`.  
   `stm32h7xx_hal_pka.c` — только для чипов с PKA (на H743 нет); см. `docs/MAKEFILE_FILES_LIST.md`.
-- **Middleware:** LwIP, FreeRTOS, mbedTLS (для HTTPS) — пути в `docs/MAKEFILE_FILES_LIST.md` и в `lwip/Makefile`.
+- **Middleware:** LwIP, FreeRTOS, mbedTLS (для HTTPS) — пути в `docs/MAKEFILE_FILES_LIST.md` и в `app/lwip/Makefile`.
 
 ---
 
@@ -43,7 +43,7 @@
 
 - В **lwipopts.h** включено: `LWIP_ALTCP 1`, `LWIP_ALTCP_TLS 1`. Для полноценного HTTPS нужно:
   - добавить mbedTLS в сборку (исходники и `mbedtls_config.h` из Cube);
-  - включить порт LwIP для mbedTLS (`LWIP_ALTCP_TLS_MBEDTLS`, файлы из `lwip/apps/altcp_tls/`);
+  - включить порт LwIP для mbedTLS (`LWIP_ALTCP_TLS_MBEDTLS`, файлы из `app/lwip/apps/altcp_tls/`);
   - реализовать сервер на порту 443 на базе Netconn API поверх `altcp_tls` (по аналогии с примером LwIP_HTTP_Server_Netconn_RTOS в `Projects/NUCLEO-H743ZI/Applications/LwIP/`).
 - Сейчас собран TCP echo (порт 7); HTTPS-сервер на 443 — следующий шаг при подключении mbedTLS.
 

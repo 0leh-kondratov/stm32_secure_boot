@@ -7,7 +7,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "=== clean ==="
-make -f demo/Makefile clean 2>/dev/null || true
+make -f app/demo/Makefile clean 2>/dev/null || true
 make -f bootloader/Makefile clean
 
 echo ""
@@ -21,7 +21,7 @@ python3 scripts/sign_image.py build/app/app.bin build/app/signed_app.bin
 
 echo ""
 echo "=== demo ==="
-make -f demo/Makefile all
+make -f app/demo/Makefile all
 
 echo ""
 echo "=== minimal-usart3 ==="

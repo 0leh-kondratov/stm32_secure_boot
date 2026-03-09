@@ -24,6 +24,7 @@ showAnalyzer usart3
 # Затем можно ставить breakpoint, monitor start, continue
 machine StartGdbServer 3333
 
-# cpu AddHook `sysbus GetSymbolAddress "main"` "this.LogLevel 0; print '>>> Entered main'; this.LogLevel 3"
+# Меньше шума от нереализованных регистров RCC/peripheral
+logLevel 3
 
 start

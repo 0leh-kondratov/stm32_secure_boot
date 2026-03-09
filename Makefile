@@ -25,11 +25,11 @@ debug:
 	$(MAKE) -f bootloader/Makefile debug
 
 demo:
-	$(MAKE) -f demo/Makefile all
+	$(MAKE) -f app/demo/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
 
 # LwIP + FreeRTOS + TCP echo server (NUCLEO-H743ZI). Requires CUBE_ROOT with Drivers and Middlewares.
 lwip:
-	$(MAKE) -f lwip/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
+	$(MAKE) -f app/lwip/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
 
 flash-lwip: lwip
 	st-flash write build/lwip/lwip.bin 0x08000000
@@ -52,14 +52,14 @@ flash-demo-official: demo-official
 
 # Step 1: I2C1 (PB8/PB9) + LCD 1602 baseline. No FreeRTOS.
 step1:
-	$(MAKE) -f step1/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
+	$(MAKE) -f app/step1/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
 
 flash-step1: step1
 	st-flash write build/step1/step1.bin 0x08000000
 
 # Step 2: FreeRTOS + DisplayTask (LCD counter 1s).
 step2:
-	$(MAKE) -f step2/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
+	$(MAKE) -f app/step2/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
 
 flash-step2: step2
 	st-flash write build/step2/step2.bin 0x08000000
@@ -70,7 +70,7 @@ test-stage1:
 
 # Stage 2: FreeRTOS + LCD counter every 1s, "Wallet Init" on screen.
 test-stage2:
-	$(MAKE) -f tests/stage2_freertos_lcd/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
+	$(MAKE) -f test/stage2_freertos_lcd/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
 
 flash-stage1: test-stage1
 	st-flash write build/stage1/stage1.bin 0x08000000
@@ -85,10 +85,10 @@ clean-step1:
 	rm -rf build/step1
 
 clean-demo:
-	$(MAKE) -f demo/Makefile clean 2>/dev/null || true
+	$(MAKE) -f app/demo/Makefile clean 2>/dev/null || true
 
 clean-lwip:
-	$(MAKE) -f lwip/Makefile clean 2>/dev/null || true
+	$(MAKE) -f app/lwip/Makefile clean 2>/dev/null || true
 
 clean-tests:
 	rm -rf build/stage1 build/stage2

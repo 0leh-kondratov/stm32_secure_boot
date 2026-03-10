@@ -13,8 +13,9 @@ AS      = arm-none-eabi-gcc -x assembler-with-cpp
 
 CFLAGS  = -mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=c11 -Wall -O2 -g
 CFLAGS += -DDEBUG -DSTM32H743xx -DUSE_HAL_DRIVER -DUSE_PWR_LDO_SUPPLY -DUSE_STM32H7XX_NUCLEO_144_MB1364
-CFLAGS += -DUART_LOG_USE_USART3
+CFLAGS += -DLWIP_BUILD -DUART_LOG_USE_USART3
 CFLAGS += -I$(TOP)/common
+CFLAGS += -I$(TOP)/app/lwip/Inc
 CFLAGS += -I$(TOP)/FreeRTOS/Source/include
 CFLAGS += -I$(TOP)/FreeRTOS/Source/portable/GCC/ARM_CM4F
 CFLAGS += -I$(CUBE_ROOT)/Drivers/CMSIS/Include
@@ -30,7 +31,7 @@ CFLAGS += -I$(CUBE_ROOT)/Middlewares/Third_Party/LwIP/system
 CFLAGS += -I$(CUBE_ROOT)/Middlewares/Third_Party/FreeRTOS/Source/include
 CFLAGS += -I$(CUBE_ROOT)/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2
 
-LDFLAGS = -T$(TOP)/app/lwip/lwip_nucleo_h743zi.ld -nostdlib -Wl,--gc-sections -lgcc -specs=nosys.specs -lc
+LDFLAGS = -T$(TOP)/app/lwip/lwip_nucleo_h743zi.ld -nostdlib -Wl,--gc-sections -lgcc -specs=nosys.specs -lc -lnosys
 
 BUILD   = build/lwip
 FREERTOS_SRC = $(TOP)/FreeRTOS/Source
@@ -58,19 +59,19 @@ STARTUP = $(TOP)/app/startup_stm32h743xx.s
 OBJ = $(BUILD)/startup.o \
       $(BUILD)/main.o $(BUILD)/ethernetif.o $(BUILD)/app_ethernet.o $(BUILD)/tcp_echo_server.o \
       $(BUILD)/stm32h7xx_it.o $(BUILD)/system_stm32h7xx.o $(BUILD)/stm32h7xx_hal_timebase_tim.o $(BUILD)/uart_log.o \
-      $(BUILD)/tasks.o $(BUILD)/queue.o $(BUILD)/list.o $(BUILD)/timers.o \
+      $(BUILD)/tasks.o $(BUILD)/queue.o $(BUILD)/list.o $(BUILD)/timers.o $(BUILD)/event_groups.o $(BUILD)/stream_buffer.o \
       $(BUILD)/port.o $(BUILD)/heap_4.o $(BUILD)/cmsis_os2.o \
-      $(BUILD)/hal_cortex.o $(BUILD)/hal_dma.o $(BUILD)/hal_eth.o $(BUILD)/hal_exti.o $(BUILD)/hal_flash.o \
-      $(BUILD)/hal_gpio.o $(BUILD)/hal_pwr.o $(BUILD)/hal_rcc.o $(BUILD)/hal_tim.o $(BUILD)/hal_uart.o $(BUILD)/hal_i2c.o \
+      $(BUILD)/hal.o $(BUILD)/hal_cortex.o $(BUILD)/hal_dma.o $(BUILD)/hal_eth.o $(BUILD)/hal_exti.o $(BUILD)/hal_flash.o \
+      $(BUILD)/hal_gpio.o $(BUILD)/hal_pwr.o $(BUILD)/hal_rcc.o $(BUILD)/hal_tim.o $(BUILD)/hal_uart.o \
       $(BUILD)/hal_rcc_ex.o $(BUILD)/hal_pwr_ex.o $(BUILD)/hal_uart_ex.o $(BUILD)/hal_tim_ex.o $(BUILD)/hal_flash_ex.o \
-      $(BUILD)/bsp_nucleo.o $(BUILD)/lan8742.o $(BUILD)/lcd_1602_i2c.o \
+      $(BUILD)/bsp_nucleo.o $(BUILD)/lan8742.o \
       $(BUILD)/lwip_api_lib.o $(BUILD)/lwip_api_msg.o $(BUILD)/lwip_err.o $(BUILD)/lwip_netbuf.o $(BUILD)/lwip_netdb.o \
       $(BUILD)/lwip_netifapi.o $(BUILD)/lwip_sockets.o $(BUILD)/lwip_tcpip.o \
       $(BUILD)/lwip_def.o $(BUILD)/lwip_dns.o $(BUILD)/lwip_inet_chksum.o $(BUILD)/lwip_init.o $(BUILD)/lwip_ip.o \
       $(BUILD)/lwip_mem.o $(BUILD)/lwip_memp.o $(BUILD)/lwip_pbuf.o $(BUILD)/lwip_raw.o $(BUILD)/lwip_stats.o $(BUILD)/lwip_sys.o \
       $(BUILD)/lwip_altcp.o $(BUILD)/lwip_altcp_alloc.o $(BUILD)/lwip_altcp_tcp.o \
       $(BUILD)/lwip_tcp.o $(BUILD)/lwip_tcp_in.o $(BUILD)/lwip_tcp_out.o $(BUILD)/lwip_udp.o $(BUILD)/lwip_netif.o \
-      $(BUILD)/lwip_ip4.o $(BUILD)/lwip_etharp.o $(BUILD)/lwip_dhcp.o $(BUILD)/lwip_timeouts.o \
+      $(BUILD)/lwip_ip4.o $(BUILD)/lwip_etharp.o $(BUILD)/lwip_icmp.o $(BUILD)/lwip_dhcp.o $(BUILD)/lwip_acd.o $(BUILD)/lwip_timeouts.o \
       $(BUILD)/lwip_ip4_addr.o $(BUILD)/lwip_ip4_frag.o \
       $(BUILD)/lwip_ethernet.o $(BUILD)/lwip_slip.o $(BUILD)/lwip_sys_arch.o
 
@@ -82,7 +83,7 @@ $(BUILD):
 $(BUILD)/startup.o: $(STARTUP) | $(BUILD)
 	$(AS) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/main.o: $(FREERTOS_SRC)/main.c | $(BUILD)
+$(BUILD)/main.o: $(TOP)/app/lwip/main.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/ethernetif.o: $(FREERTOS_SRC)/ethernetif.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -99,13 +100,17 @@ $(BUILD)/stm32h7xx_hal_timebase_tim.o: $(FREERTOS_SRC)/stm32h7xx_hal_timebase_ti
 $(BUILD)/uart_log.o: $(TOP)/common/uart_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/tasks.o: $(FREERTOS_SRC)/tasks.c | $(BUILD)
+$(BUILD)/tasks.o: $(FREERTOS_CUBE)/tasks.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
-$(BUILD)/queue.o: $(FREERTOS_SRC)/queue.c | $(BUILD)
+$(BUILD)/queue.o: $(FREERTOS_CUBE)/queue.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
-$(BUILD)/list.o: $(FREERTOS_SRC)/list.c | $(BUILD)
+$(BUILD)/list.o: $(FREERTOS_CUBE)/list.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
-$(BUILD)/timers.o: $(FREERTOS_SRC)/timers.c | $(BUILD)
+$(BUILD)/timers.o: $(FREERTOS_CUBE)/timers.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/event_groups.o: $(FREERTOS_CUBE)/event_groups.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/stream_buffer.o: $(FREERTOS_CUBE)/stream_buffer.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/port.o: $(PORT)/port.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -115,6 +120,8 @@ $(BUILD)/heap_4.o: $(MEMMANG)/heap_4.c | $(BUILD)
 $(BUILD)/cmsis_os2.o: $(FREERTOS_CUBE)/CMSIS_RTOS_V2/cmsis_os2.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(BUILD)/hal.o: $(HAL_SRC)/stm32h7xx_hal.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/hal_cortex.o: $(HAL_SRC)/stm32h7xx_hal_cortex.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/hal_dma.o: $(HAL_SRC)/stm32h7xx_hal_dma.c | $(BUILD)
@@ -135,8 +142,6 @@ $(BUILD)/hal_tim.o: $(HAL_SRC)/stm32h7xx_hal_tim.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/hal_uart.o: $(HAL_SRC)/stm32h7xx_hal_uart.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
-$(BUILD)/hal_i2c.o: $(HAL_SRC)/stm32h7xx_hal_i2c.c | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/hal_rcc_ex.o: $(HAL_SRC)/stm32h7xx_hal_rcc_ex.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/hal_pwr_ex.o: $(HAL_SRC)/stm32h7xx_hal_pwr_ex.c | $(BUILD)
@@ -152,8 +157,6 @@ $(BUILD)/bsp_nucleo.o: $(BSP_SRC)/stm32h7xx_nucleo.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/lan8742.o: $(LAN8742_SRC)/lan8742.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
-$(BUILD)/lcd_1602_i2c.o: $(TOP)/common/lcd_1602_i2c.c | $(BUILD)
-	$(CC) $(CFLAGS) -DUSE_HAL_DRIVER -c -o $@ $<
 
 $(BUILD)/lwip_api_lib.o: $(LWIP_API)/api_lib.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -212,9 +215,13 @@ $(BUILD)/lwip_netif.o: $(LWIP_CORE)/netif.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/lwip_ip4.o: $(LWIP_IPV4)/ip4.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/lwip_icmp.o: $(LWIP_IPV4)/icmp.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/lwip_etharp.o: $(LWIP_IPV4)/etharp.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/lwip_dhcp.o: $(LWIP_IPV4)/dhcp.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/lwip_acd.o: $(LWIP_IPV4)/acd.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/lwip_timeouts.o: $(LWIP_CORE)/timeouts.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -229,7 +236,7 @@ $(BUILD)/lwip_slip.o: $(LWIP_NETIF)/slipif.c | $(BUILD)
 $(BUILD)/lwip_sys_arch.o: $(LWIP_ARCH)/sys_arch.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/lwip.elf: $(OBJ) $(TOP)/lwip/lwip_nucleo_h743zi.ld
+$(BUILD)/lwip.elf: $(OBJ) $(TOP)/app/lwip/lwip_nucleo_h743zi.ld
 	$(LD) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS)
 	@echo "Built: $(BUILD)/lwip.elf"
 

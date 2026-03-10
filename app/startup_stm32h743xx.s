@@ -30,18 +30,28 @@ g_pfnVectors:
     .word 0
     .word PendSV_Handler
     .word SysTick_Handler
-    .rept 240
-    .word 0
+    /* IRQ 0..60: Default_Handler (slot 16+0 .. 16+60) */
+    .rept 61
+    .word Default_Handler
+    .endr
+    .word ETH_IRQHandler
+    /* IRQ 62..239 */
+    .rept 178
+    .word Default_Handler
     .endr
 
 .thumb_func
 Reset_Handler:
     ldr r0, =_estack
     msr msp, r0
-    /* H7: power supply and clock init (required before .data/.bss and main) */
-    bl ExitRun0Mode
-    bl SystemInit
-    /* LED1 (PB0) on: enable GPIOB, set PB0 output low (active-low) */
+    /* Enable FPU before any C code (CPACR); required for -mfloat-abi=hard to avoid UsageFault NOCP */
+    ldr r0, =0xE000ED88
+    ldr r1, [r0]
+    orr r1, r1, #(0xF << 20)
+    str r1, [r0]
+    dsb
+    isb
+    /* LED1 (PB0) on immediately — so we see it even if we hang in ExitRun0Mode/SystemInit */
     ldr r0, =0x58024400
     ldr r1, [r0, #0xE0]
     orr r1, r1, #(1 << 1)
@@ -53,7 +63,9 @@ Reset_Handler:
     str r1, [r0, #0]
     mov r1, #(1 << 16)
     str r1, [r0, #0x18]
-
+    /* H7: power supply and clock init (required before .data/.bss and main) */
+    bl ExitRun0Mode
+    bl SystemInit
     ldr r0, =_sbss
     ldr r1, =_ebss
     mov r2, #0
@@ -76,6 +88,12 @@ Reset_Handler:
     b .
 
 .thumb_func
+.weak NMI_Handler
+.weak HardFault_Handler
+.weak MemManage_Handler
+.weak BusFault_Handler
+.weak UsageFault_Handler
+.weak DebugMon_Handler
 Default_Handler:
 NMI_Handler:
 HardFault_Handler:

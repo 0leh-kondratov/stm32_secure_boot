@@ -44,10 +44,13 @@ MEMMANG  = $(FREERTOS_SRC)/portable/MemMang
 FREERTOS_INC = $(FREERTOS_SRC)/include
 STEP1_CFG    = $(TOP)/app/step1/FreeRTOSConfig.h
 
-config-copied: $(STEP1_CFG)
+# Always copy step1 config when building step1 (so step2's config doesn't break step1)
+force-step1-config:
 	@cp "$(FREERTOS_INC)/FreeRTOSConfig.h" "$(FREERTOS_INC)/FreeRTOSConfig.h.bak" 2>/dev/null || true
 	@cp "$(STEP1_CFG)" "$(FREERTOS_INC)/FreeRTOSConfig.h"
 	@touch config-copied
+
+config-copied: force-step1-config
 
 OBJ = $(BUILD)/main.o $(BUILD)/stm32h7xx_hal_msp.o $(BUILD)/stm32h7xx_it.o $(BUILD)/startup.o $(BUILD)/system_stm32h7xx.o \
       $(BUILD)/hal_cortex.o $(BUILD)/hal_gpio.o $(BUILD)/hal_rcc.o $(BUILD)/hal_rcc_ex.o \
@@ -61,7 +64,7 @@ $(BUILD)/timers.o: config-copied
 $(BUILD)/heap_4.o: config-copied
 $(BUILD)/port.o: config-copied
 
-all: config-copied $(BUILD)/step1.elf $(BUILD)/step1.bin
+all: force-step1-config config-copied $(BUILD)/step1.elf $(BUILD)/step1.bin
 	@mv "$(FREERTOS_INC)/FreeRTOSConfig.h.bak" "$(FREERTOS_INC)/FreeRTOSConfig.h" 2>/dev/null || true
 
 $(BUILD):

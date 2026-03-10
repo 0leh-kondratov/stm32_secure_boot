@@ -45,12 +45,24 @@ void NMI_Handler(void)
 
 /**
   * @brief  This function handles Hard Fault exception.
-  * @param  None
-  * @retval None
+  *         In GDB: p/x g_hardfault_hfsr, g_hardfault_cfsr, g_hardfault_bfar, g_hardfault_pc
+  *         then x/i g_hardfault_pc to see faulting instruction.
   */
+static volatile uint32_t g_hardfault_hfsr;
+static volatile uint32_t g_hardfault_cfsr;
+static volatile uint32_t g_hardfault_bfar;
+static volatile uint32_t g_hardfault_pc;
+
 void HardFault_Handler(void)
 {
-  /* Go to infinite loop when Hard Fault exception occurs */
+  g_hardfault_hfsr = SCB->HFSR;
+  g_hardfault_cfsr = SCB->CFSR;
+  g_hardfault_bfar = SCB->BFAR;
+  /* Stacked PC (faulting instruction) is at MSP+24 on exception entry */
+  {
+    uint32_t *msp = (uint32_t *)__get_MSP();
+    g_hardfault_pc = msp[6];
+  }
   while (1)
   {
   }
@@ -84,12 +96,14 @@ void BusFault_Handler(void)
 
 /**
   * @brief  This function handles Usage Fault exception.
-  * @param  None
-  * @retval None
+  *         В GDB: p/x g_usage_fault_cfsr — причина (UFSR в битах 16–31).
+  *         Адрес сбойной инструкции: x/xw $sp+24  затем  x/i <значение>
   */
+static volatile uint32_t g_usage_fault_cfsr;
+
 void UsageFault_Handler(void)
 {
-  /* Go to infinite loop when Usage Fault exception occurs */
+  g_usage_fault_cfsr = (*((volatile uint32_t *)0xE000ED28U)); /* SCB->CFSR */
   while (1)
   {
   }

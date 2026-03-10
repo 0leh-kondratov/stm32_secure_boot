@@ -1,7 +1,7 @@
 /*
  * Linker script for LwIP + FreeRTOS on NUCLEO-H743ZI2 (STM32H743ZI).
  * Memory: DTCM 128K, RAM_D1 512K, RAM_D2 288K (D2 domain for ETH DMA and LwIP).
- * Sections .RxDecriptorSection, .TxDecriptorSection and .LwipSection are placed
+ * Sections .RxDescripSection, .TxDescripSection and .lwip_sec are placed
  * in RAM_D2 so the MPU can mark this region non-cacheable for Ethernet DMA
  * (descriptors and buffers must be coherent with the ETH DMA engine).
  */
@@ -58,6 +58,7 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;
     _end = .;
+    end = .;
   } > RAM_D1
 
   ._user_heap_stack : {
@@ -67,22 +68,25 @@ SECTIONS
     . = ALIGN(8);
   } > RAM_D1
 
-  /* Ethernet DMA descriptors and LwIP buffers in D2 SRAM (non-cacheable via MPU).
-   * ETH DMA must access these without cache coherency issues. */
-  .RxDecriptorSection (NOLOAD) : {
-    . = ALIGN(4);
-    *(.RxDecriptorSection)
-  } > RAM_D2
+  /* Match STM32Cube reference placement in D2 SRAM:
+   * - Rx descriptors at 0x30000000
+   * - Tx descriptors at 0x30000080
+   * - RX pool        at 0x30000100
+   */
+  .lwip_sec (NOLOAD) : {
+    . = ABSOLUTE(0x30000000);
+    *(.RxDescripSection)
 
-  .TxDecriptorSection (NOLOAD) : {
-    . = ALIGN(4);
-    *(.TxDecriptorSection)
-  } > RAM_D2
+    . = ABSOLUTE(0x30000080);
+    *(.TxDescripSection)
 
-  .LwipSection (NOLOAD) : {
-    . = ALIGN(4);
-    *(.LwipSection)
+    . = ABSOLUTE(0x30000100);
     *(.Rx_PoolSection)
-    . = ALIGN(4);
+  } > RAM_D2
+
+  /* LwIP heap at 0x30004000 (16KB). Reserves region so nothing else is placed here. */
+  .lwip_ram_heap 0x30004000 (NOLOAD) : {
+    _lwip_ram_heap = .;
+    . += 0x4000;
   } > RAM_D2
 }

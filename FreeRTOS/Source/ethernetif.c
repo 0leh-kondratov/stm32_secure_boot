@@ -95,15 +95,15 @@ ETH_DMADescTypeDef  DMATxDscrTab[ETH_TX_DESC_CNT]; /* Ethernet Tx DMA Descriptor
 
 
 #elif defined ( __CC_ARM )  /* MDK ARM Compiler */
-__attribute__((section(".RxDecriptorSection"))) ETH_DMADescTypeDef  DMARxDscrTab[ETH_RX_DESC_CNT];
-__attribute__((section(".TxDecriptorSection"))) ETH_DMADescTypeDef  DMATxDscrTab[ETH_TX_DESC_CNT];
+__attribute__((section(".RxDescripSection"))) ETH_DMADescTypeDef  DMARxDscrTab[ETH_RX_DESC_CNT];
+__attribute__((section(".TxDescripSection"))) ETH_DMADescTypeDef  DMATxDscrTab[ETH_TX_DESC_CNT];
 
 #elif (defined ( __GNUC__ ) || defined ( __ARMCC_VERSION )) /* GNU Compiler */
 /* Place ETH DMA descriptors in dedicated sections so the linker puts them in
  * D2 SRAM (see .ld). MPU is configured non-cacheable for this region so the
  * DMA engine and CPU see consistent data without cache invalidation on descriptors. */
-ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((section(".RxDecriptorSection")));
-ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((section(".TxDecriptorSection")));
+ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((section(".RxDescripSection")));
+ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((section(".TxDescripSection")));
 
 #endif
 
@@ -746,6 +746,7 @@ void ethernet_link_thread( void* argument )
       }
     }
 
+    linkchanged = 0U;
     osDelay(100);
   }
 }

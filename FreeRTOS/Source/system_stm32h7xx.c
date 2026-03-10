@@ -375,9 +375,14 @@ void ExitRun0Mode(void)
     /* Enable LDO mode */
     PWR->CR3 |= PWR_CR3_LDOEN;
   #endif /* SMPS */
-  /* Wait till voltage level flag is set */
-  while ((PWR->CSR1 & PWR_CSR1_ACTVOSRDY) == 0U)
-  {}
+  /* Wait till voltage level flag is set (with timeout to avoid hang after reset) */
+  {
+    uint32_t timeout = 1000000U;
+    while ((PWR->CSR1 & PWR_CSR1_ACTVOSRDY) == 0U && timeout != 0U)
+    {
+      timeout--;
+    }
+  }
 #elif defined(USE_PWR_EXTERNAL_SOURCE_SUPPLY)
   #if defined(SMPS)
     /* Exit Run* mode */

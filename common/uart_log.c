@@ -12,84 +12,237 @@
 
 #ifdef USE_HAL_DRIVER
 #include "stm32h7xx_hal.h"
+#if defined(UART_LOG_USE_FREERTOS_QUEUE)
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "task.h"
+#endif
 #endif
 
-#define LOG_UART_TIMEOUT_MS  1000U
+#define LOG_UART_TIMEOUT_MS  20U
 
 #ifdef USE_HAL_DRIVER
 
 /* --- HAL: USART2 (PA2/PA3) = ST-Link VCP, or USART3 (PD8/PD9) --- */
 static UART_HandleTypeDef hlog_uart;
+static uint8_t hlog_uart_ready = 0U;
 
-void log_init(void)
+static HAL_StatusTypeDef log_uart_setup_instance(USART_TypeDef *instance)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-#if defined(UART_LOG_USE_USART2)
-  /* USART2: PA2 (TX), PA3 (RX) — подключено к ST-Link VCP на NUCLEO-H743ZI2 */
-  /* На H7 обязательно задать источник тактирования USART234578, иначе BRR неверный. */
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART234578;
-  PeriphClkInit.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PCLK1;
-  (void)HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
+  if (instance == USART3)
+  {
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+    __HAL_RCC_USART3_CLK_ENABLE();
 
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_USART2_CLK_ENABLE();
+    GPIO_InitStruct.Pin       = GPIO_PIN_8 | GPIO_PIN_9;
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_PULLUP;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+  }
+  else if (instance == USART2)
+  {
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_USART2_CLK_ENABLE();
 
-  GPIO_InitStruct.Pin       = GPIO_PIN_2 | GPIO_PIN_3;
-  GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull      = GPIO_NOPULL;
-  GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    GPIO_InitStruct.Pin       = GPIO_PIN_2 | GPIO_PIN_3;
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_PULLUP;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  }
+  else
+  {
+    return HAL_ERROR;
+  }
 
-  hlog_uart.Instance = USART2;
-#else
-  /* USART3: PD8 (TX), PD9 (RX) — как в demo. На H7 задать источник тактирования. */
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART234578;
-  PeriphClkInit.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PCLK1;
-  (void)HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
-
-  __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_USART3_CLK_ENABLE();
-
-  GPIO_InitStruct.Pin       = GPIO_PIN_8 | GPIO_PIN_9;
-  GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull      = GPIO_NOPULL;
-  GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
-  hlog_uart.Instance = USART3;
-#endif
-
-  hlog_uart.Init.BaudRate      = 115200;
-  hlog_uart.Init.WordLength    = UART_WORDLENGTH_8B;
-  hlog_uart.Init.StopBits      = UART_STOPBITS_1;
-  hlog_uart.Init.Parity        = UART_PARITY_NONE;
-  hlog_uart.Init.Mode          = UART_MODE_TX_RX;
-  hlog_uart.Init.HwFlowCtl     = UART_HWCONTROL_NONE;
-  hlog_uart.Init.OverSampling  = UART_OVERSAMPLING_16;
+  hlog_uart.Instance = instance;
+  hlog_uart.Init.BaudRate       = 115200;
+  hlog_uart.Init.WordLength     = UART_WORDLENGTH_8B;
+  hlog_uart.Init.StopBits       = UART_STOPBITS_1;
+  hlog_uart.Init.Parity         = UART_PARITY_NONE;
+  hlog_uart.Init.Mode           = UART_MODE_TX_RX;
+  hlog_uart.Init.HwFlowCtl      = UART_HWCONTROL_NONE;
+  hlog_uart.Init.OverSampling   = UART_OVERSAMPLING_16;
   hlog_uart.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   hlog_uart.Init.ClockPrescaler = UART_PRESCALER_DIV1;
   hlog_uart.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 
-  (void)HAL_UART_Init(&hlog_uart);
+  if (HAL_UART_Init(&hlog_uart) != HAL_OK)
+  {
+    return HAL_ERROR;
+  }
+
+  for (uint32_t i = 0; i < 100000U; i++)
+  {
+    if (__HAL_UART_GET_FLAG(&hlog_uart, UART_FLAG_TXE) != 0U)
+    {
+      return HAL_OK;
+    }
+  }
+
+  (void)HAL_UART_DeInit(&hlog_uart);
+  return HAL_TIMEOUT;
+}
+
+#if defined(UART_LOG_USE_FREERTOS_QUEUE)
+#define LOG_QUEUE_LEN      4U
+#define LOG_MSG_MAX_LEN    128U
+#define LOG_TASK_STACK     384U
+#define LOG_TASK_PRIO      (tskIDLE_PRIORITY + 1U)
+
+typedef struct
+{
+  char text[LOG_MSG_MAX_LEN];
+} log_msg_t;
+
+static QueueHandle_t slog_queue = NULL;
+static TaskHandle_t slog_task = NULL;
+
+static void log_uart_tx_blocking(const char *str)
+{
+  size_t len;
+  if (str == NULL || hlog_uart_ready == 0U)
+  {
+    return;
+  }
+  len = strlen(str);
+  if (len == 0U)
+  {
+    return;
+  }
+  (void)HAL_UART_Transmit(&hlog_uart, (const uint8_t *)str, (uint16_t)len, LOG_UART_TIMEOUT_MS);
+}
+
+static void log_task(void *arg)
+{
+  log_msg_t msg;
+  (void)arg;
+  for (;;)
+  {
+    if (xQueueReceive(slog_queue, &msg, portMAX_DELAY) == pdTRUE)
+    {
+      log_uart_tx_blocking(msg.text);
+    }
+  }
+}
+
+static void log_try_start_async(void)
+{
+  if (xTaskGetSchedulerState() != taskSCHEDULER_RUNNING)
+  {
+    return;
+  }
+
+  if (slog_queue == NULL)
+  {
+    slog_queue = xQueueCreate((UBaseType_t)LOG_QUEUE_LEN, sizeof(log_msg_t));
+    if (slog_queue == NULL)
+    {
+      return;
+    }
+  }
+
+  if (slog_task == NULL)
+  {
+    if (xTaskCreate(log_task, "Log", (configSTACK_DEPTH_TYPE)LOG_TASK_STACK, NULL, (UBaseType_t)LOG_TASK_PRIO, &slog_task) != pdPASS)
+    {
+      slog_task = NULL;
+    }
+  }
+}
+#endif
+
+void log_init(void)
+{
+  HAL_StatusTypeDef st = HAL_ERROR;
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+
+  hlog_uart_ready = 0U;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART234578;
+  PeriphClkInit.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PCLK1;
+  (void)HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
+
+#if defined(UART_LOG_USE_USART2)
+  st = log_uart_setup_instance(USART2);
+#elif defined(UART_LOG_USE_USART3)
+  st = log_uart_setup_instance(USART3);
+#else
+  /* Default: prefer USART3 (step1), fallback to USART2 when TXE is dead. */
+  st = log_uart_setup_instance(USART3);
+  if (st != HAL_OK)
+  {
+    st = log_uart_setup_instance(USART2);
+  }
+#endif
+
+  if (st == HAL_OK)
+  {
+    hlog_uart_ready = 1U;
+  }
+
 }
 
 void log_puts(const char *str)
 {
-  if (str == NULL || hlog_uart.gState != HAL_UART_STATE_READY)
+#if defined(UART_LOG_USE_FREERTOS_QUEUE)
+  log_msg_t msg;
+  size_t n;
+
+  if (str == NULL || hlog_uart_ready == 0U)
+  {
+    return;
+  }
+
+  if (xTaskGetSchedulerState() != taskSCHEDULER_RUNNING)
+  {
+    log_uart_tx_blocking(str);
+    return;
+  }
+
+  log_try_start_async();
+
+  if (slog_queue == NULL)
+  {
+    log_uart_tx_blocking(str);
+    return;
+  }
+
+  n = strlen(str);
+  if (n >= LOG_MSG_MAX_LEN)
+  {
+    n = LOG_MSG_MAX_LEN - 1U;
+  }
+  if (n == 0U)
+  {
+    return;
+  }
+
+  memcpy(msg.text, str, n);
+  msg.text[n] = '\0';
+  if (xQueueSend(slog_queue, &msg, 0U) != pdTRUE)
+  {
+    /* Keep critical logs even when queue is temporarily full. */
+    log_uart_tx_blocking(msg.text);
+  }
+#else
+  if (str == NULL || hlog_uart_ready == 0U || hlog_uart.gState != HAL_UART_STATE_READY)
     return;
   size_t len = strlen(str);
   if (len == 0)
     return;
   (void)HAL_UART_Transmit(&hlog_uart, (const uint8_t *)str, (uint16_t)len, LOG_UART_TIMEOUT_MS);
+#endif
 }
 
 int log_getchar(void)
 {
+  if (hlog_uart_ready == 0U)
+    return -1;
   if (__HAL_UART_GET_FLAG(&hlog_uart, UART_FLAG_RXNE) == 0U)
     return -1;
   return (int)(uint8_t)(hlog_uart.Instance->RDR & 0xFFU);

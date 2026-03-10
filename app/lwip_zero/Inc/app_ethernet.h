@@ -22,6 +22,8 @@ extern "C" {
 #define DHCP_LINK_DOWN        ((uint8_t)5)
 
 void ethernet_link_status_updated(struct netif *netif);
+uint8_t ethernet_led2_is_on(void);
+uint8_t ethernet_led3_is_on(void);
 #if LWIP_DHCP
 void DHCP_Thread(void *argument);
 #endif

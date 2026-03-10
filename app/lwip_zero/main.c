@@ -11,6 +11,9 @@
 #include "lwip/netif.h"
 #include "lwip/tcpip.h"
 #include "app_ethernet.h"
+#include "netconn_page.h"
+#include "uart_log.h"
+#include <stdio.h>
 
 struct netif gnetif;
 
@@ -42,6 +45,13 @@ static void Netif_Config(void);
 static void MPU_Config(void);
 static void CPU_CACHE_Enable(void);
 static void StartThread(void *argument);
+static void Log_Netif_Identity(void);
+static void LED1_Init(void);
+
+uint8_t led1_is_on(void)
+{
+  return (HAL_GPIO_ReadPin(LED1_GPIO_PORT, LED1_PIN) == LED1_ON_LEVEL) ? 1U : 0U;
+}
 
 int main(void)
 {
@@ -54,6 +64,8 @@ int main(void)
   HAL_Init();
   SystemClock_Config();
   BSP_Config();
+  log_init();
+  log_puts("[BOOT] lwip_zero start\r\n");
 
   osKernelInitialize();
   StartHandle = osThreadNew(StartThread, NULL, &Start_attributes);
@@ -77,6 +89,9 @@ static void StartThread(void *argument)
   tcpip_init(NULL, NULL);
 
   Netif_Config();
+  Log_Netif_Identity();
+  netconn_page_start(&gnetif);
+  log_puts("[HTTP] Netconn server on port 80\r\n");
 
   for (;;)
   {
@@ -86,6 +101,8 @@ static void StartThread(void *argument)
 
 static void BSP_Config(void)
 {
+  LED1_Init();
+  HAL_GPIO_WritePin(LED1_GPIO_PORT, LED1_PIN, LED1_OFF_LEVEL);
   BSP_LED_Init(LED2);
   BSP_LED_Init(LED3);
 }
@@ -118,6 +135,28 @@ static void Netif_Config(void)
 #if LWIP_DHCP
   DHCPHandle = osThreadNew(DHCP_Thread, &gnetif, &DHCPThread_attributes);
 #endif
+}
+
+static void Log_Netif_Identity(void)
+{
+  char line[96];
+  (void)snprintf(line, sizeof(line), "[ETH] MAC=%02X:%02X:%02X:%02X:%02X:%02X\r\n",
+                 (unsigned int)gnetif.hwaddr[0], (unsigned int)gnetif.hwaddr[1],
+                 (unsigned int)gnetif.hwaddr[2], (unsigned int)gnetif.hwaddr[3],
+                 (unsigned int)gnetif.hwaddr[4], (unsigned int)gnetif.hwaddr[5]);
+  log_puts(line);
+}
+
+static void LED1_Init(void)
+{
+  GPIO_InitTypeDef gpio = {0};
+
+  LED1_GPIO_CLK_ENABLE();
+  gpio.Pin = LED1_PIN;
+  gpio.Mode = GPIO_MODE_OUTPUT_PP;
+  gpio.Pull = GPIO_NOPULL;
+  gpio.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED1_GPIO_PORT, &gpio);
 }
 
 static void SystemClock_Config(void)

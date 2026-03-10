@@ -11,7 +11,9 @@ AS      = arm-none-eabi-gcc -x assembler-with-cpp
 
 CFLAGS  = -mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=c11 -Wall -O2 -g
 CFLAGS += -DDEBUG -DSTM32H743xx -DUSE_HAL_DRIVER -DUSE_PWR_LDO_SUPPLY -DUSE_STM32H7XX_NUCLEO_144_MB1364
+CFLAGS += -DUART_LOG_USE_FREERTOS_QUEUE
 CFLAGS += -I$(TOP)/app/lwip_zero/Inc
+CFLAGS += -I$(TOP)/common
 CFLAGS += -I$(APP_LOCAL)/Inc
 CFLAGS += -I$(CUBE_LOCAL)/Drivers/CMSIS/Include
 CFLAGS += -I$(CUBE_LOCAL)/Drivers/CMSIS/Device/ST/STM32H7xx/Include
@@ -47,7 +49,7 @@ LWIP_IPV4 = $(LWIP_SRC)/core/ipv4
 STARTUP = $(CUBE_LOCAL)/Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/gcc/startup_stm32h743xx.s
 
 OBJ = $(BUILD)/startup.o \
-      $(BUILD)/main.o $(BUILD)/ethernetif.o $(BUILD)/app_ethernet.o \
+      $(BUILD)/main.o $(BUILD)/netconn_page.o $(BUILD)/uart_log.o $(BUILD)/ethernetif.o $(BUILD)/app_ethernet.o \
       $(BUILD)/stm32h7xx_it.o $(BUILD)/system_stm32h7xx.o $(BUILD)/stm32h7xx_hal_timebase_tim.o \
       $(BUILD)/tasks.o $(BUILD)/queue.o $(BUILD)/list.o $(BUILD)/timers.o $(BUILD)/event_groups.o $(BUILD)/stream_buffer.o \
       $(BUILD)/port.o $(BUILD)/heap_4.o $(BUILD)/cmsis_os2.o \
@@ -73,6 +75,10 @@ $(BUILD)/startup.o: $(STARTUP) | $(BUILD)
 	$(AS) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/main.o: $(TOP)/app/lwip_zero/main.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/netconn_page.o: $(TOP)/app/lwip_zero/netconn_page.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/uart_log.o: $(TOP)/common/uart_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/ethernetif.o: $(APP_SRC)/ethernetif.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<

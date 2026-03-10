@@ -24,18 +24,80 @@
 #include "app_ethernet.h"
 #include "ethernetif.h"
 #include "lwip/netifapi.h"
+#include "lwip/ip4_addr.h"
+#include "uart_log.h"
+#include <stdio.h>
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+static volatile uint8_t s_led2_on = 0U;
+static volatile uint8_t s_led3_on = 0U;
 #if LWIP_DHCP
 #define MAX_DHCP_TRIES  4
 __IO uint8_t DHCP_state = DHCP_OFF;
 #endif
 
 /* Private function prototypes -----------------------------------------------*/
+static void ethernet_log_netif_addr(const char *prefix, const struct netif *netif);
+static void ethernet_set_led(uint32_t led, uint8_t on);
 /* Private functions ---------------------------------------------------------*/
+
+uint8_t ethernet_led2_is_on(void)
+{
+  return s_led2_on;
+}
+
+uint8_t ethernet_led3_is_on(void)
+{
+  return s_led3_on;
+}
+
+static void ethernet_set_led(uint32_t led, uint8_t on)
+{
+  if (on != 0U)
+  {
+    BSP_LED_On((Led_TypeDef)led);
+  }
+  else
+  {
+    BSP_LED_Off((Led_TypeDef)led);
+  }
+
+  if (led == (uint32_t)LED2)
+  {
+    s_led2_on = (on != 0U) ? 1U : 0U;
+  }
+  else if (led == (uint32_t)LED3)
+  {
+    s_led3_on = (on != 0U) ? 1U : 0U;
+  }
+}
+
+static void ethernet_log_netif_addr(const char *prefix, const struct netif *netif)
+{
+  char ip_buf[16];
+  char mask_buf[16];
+  char gw_buf[16];
+  char line[128];
+
+  if (ip4addr_ntoa_r(netif_ip4_addr(netif), ip_buf, sizeof(ip_buf)) == NULL)
+  {
+    (void)snprintf(ip_buf, sizeof(ip_buf), "0.0.0.0");
+  }
+  if (ip4addr_ntoa_r(netif_ip4_netmask(netif), mask_buf, sizeof(mask_buf)) == NULL)
+  {
+    (void)snprintf(mask_buf, sizeof(mask_buf), "0.0.0.0");
+  }
+  if (ip4addr_ntoa_r(netif_ip4_gw(netif), gw_buf, sizeof(gw_buf)) == NULL)
+  {
+    (void)snprintf(gw_buf, sizeof(gw_buf), "0.0.0.0");
+  }
+
+  (void)snprintf(line, sizeof(line), "%s IP=%s MASK=%s GW=%s\r\n", prefix, ip_buf, mask_buf, gw_buf);
+  log_puts(line);
+}
 /**
   * @brief  Notify the User about the network interface config status
   * @param  netif: the network interface
@@ -45,22 +107,24 @@ void ethernet_link_status_updated(struct netif *netif)
 {
   if (netif_is_up(netif))
  {
+    log_puts("[ETH] Link up\r\n");
 #if LWIP_DHCP
     /* Update DHCP state machine */
     DHCP_state = DHCP_START;
 #else
-    BSP_LED_On(LED2);
-    BSP_LED_Off(LED3);
+    ethernet_set_led((uint32_t)LED2, 1U);
+    ethernet_set_led((uint32_t)LED3, 0U);
 #endif /* LWIP_DHCP */
   }
   else
   {
+    log_puts("[ETH] Link down\r\n");
 #if LWIP_DHCP
     /* Update DHCP state machine */
     DHCP_state = DHCP_LINK_DOWN;
 #else
-    BSP_LED_Off(LED2);
-    BSP_LED_On(LED3);
+    ethernet_set_led((uint32_t)LED2, 0U);
+    ethernet_set_led((uint32_t)LED3, 1U);
 #endif /* LWIP_DHCP */
   }
 }
@@ -85,13 +149,14 @@ void DHCP_Thread(void* argument)
     {
     case DHCP_START:
       {
+        log_puts("[DHCP] Start\r\n");
         ip_addr_set_zero_ip4(&netif->ip_addr);
         ip_addr_set_zero_ip4(&netif->netmask);
         ip_addr_set_zero_ip4(&netif->gw);
         DHCP_state = DHCP_WAIT_ADDRESS;
 
-        BSP_LED_Off(LED2);
-        BSP_LED_Off(LED3);
+        ethernet_set_led((uint32_t)LED2, 0U);
+        ethernet_set_led((uint32_t)LED3, 0U);
 
         netifapi_dhcp_start(netif);
       }
@@ -101,9 +166,10 @@ void DHCP_Thread(void* argument)
         if (dhcp_supplied_address(netif))
         {
           DHCP_state = DHCP_ADDRESS_ASSIGNED;
+          ethernet_log_netif_addr("[DHCP] Assigned", netif);
 
-          BSP_LED_On(LED2);
-          BSP_LED_Off(LED3);
+          ethernet_set_led((uint32_t)LED2, 1U);
+          ethernet_set_led((uint32_t)LED3, 0U);
         }
         else
         {
@@ -119,9 +185,10 @@ void DHCP_Thread(void* argument)
             IP_ADDR4(&netmask, NETMASK_ADDR0, NETMASK_ADDR1, NETMASK_ADDR2, NETMASK_ADDR3);
             IP_ADDR4(&gw, GW_ADDR0, GW_ADDR1, GW_ADDR2, GW_ADDR3);
             netifapi_netif_set_addr(netif, ip_2_ip4(&ipaddr), ip_2_ip4(&netmask), ip_2_ip4(&gw));
+            ethernet_log_netif_addr("[DHCP] Timeout, static", netif);
 
-            BSP_LED_On(LED2);
-            BSP_LED_Off(LED3);
+            ethernet_set_led((uint32_t)LED2, 1U);
+            ethernet_set_led((uint32_t)LED3, 0U);
           }
         }
       }
@@ -130,8 +197,8 @@ void DHCP_Thread(void* argument)
     {
       DHCP_state = DHCP_OFF;
 
-      BSP_LED_Off(LED2);
-      BSP_LED_On(LED3);
+      ethernet_set_led((uint32_t)LED2, 0U);
+      ethernet_set_led((uint32_t)LED3, 1U);
     }
     break;
     default: break;

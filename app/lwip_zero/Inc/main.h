@@ -15,6 +15,13 @@ extern "C" {
 #include "stm32h7xx_hal.h"
 #include "stm32h7xx_nucleo.h"
 
+/* LED1 on NUCLEO-H743ZI2: PB0, active-low (low = ON). */
+#define LED1_PIN               GPIO_PIN_0
+#define LED1_GPIO_PORT         GPIOB
+#define LED1_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
+#define LED1_ON_LEVEL          GPIO_PIN_RESET
+#define LED1_OFF_LEVEL         GPIO_PIN_SET
+
 /* Static fallback IP (used only when DHCP timeout happens). */
 #define IP_ADDR0 ((uint8_t)192U)
 #define IP_ADDR1 ((uint8_t)168U)
@@ -32,6 +39,7 @@ extern "C" {
 #define GW_ADDR3 ((uint8_t)1U)
 
 void Error_Handler(void);
+uint8_t led1_is_on(void);
 
 #ifdef __cplusplus
 }

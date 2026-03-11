@@ -90,7 +90,7 @@ test-board-step1-flash:
 step1-renode:
 	$(MAKE) -f app/step1/Makefile renode CUBE_ROOT="$(CUBE_ROOT)" TOP="$(CURDIR)"
 	@echo "Run: renode step1.resc"
-@echo "  UART: usart3 / telnet localhost 12345 — oczekiwany \"Krok 1: OK\" co 2 sekundy."
+	@echo "  UART: usart3 / telnet localhost 12345 - expected \"Step 1: OK\" every 2 seconds."
 
 # Step 2: FreeRTOS + Logger + LED + I2C scanner (scan result to UART log).
 step2:

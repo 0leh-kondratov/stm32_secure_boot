@@ -1,7 +1,5 @@
 # STM32 Secure Boot + FreeRTOS/LwIP (NUCLEO-H743ZI2)
 
-![STM32 Secure Boot Demo](photo_2026-03-11_09-20-41.jpg)
-
 Repozytorium zawiera zestaw firmware'ow edukacyjnych i testowych dla STM32H743:
 - secure bootloader,
 - kilka etapow aplikacji (`step1`, `step2`),
@@ -9,6 +7,24 @@ Repozytorium zawiera zestaw firmware'ow edukacyjnych i testowych dla STM32H743:
 - scenariusze testow i debugowania.
 
 Projekt jest nastawiony na praktyczne uruchamianie na plytce **NUCLEO-H743ZI2** oraz szybka diagnostyke przez UART/GDB.
+
+## Pet project: cold wallet (krotko)
+
+Cold wallet (portfel "zimny") to model, w ktorym **klucz prywatny nie jest stale podlaczony do sieci**.
+Najwazniejsza idea:
+- srodowisko online przygotowuje dane/transakcje,
+- urzadzenie offline (lub silnie ograniczone) wykonuje podpis,
+- do sieci wraca tylko wynik podpisu, nie klucz.
+
+W tym repo pet project jest skupiony na podstawach takiego podejscia:
+- secure boot (weryfikacja obrazu przed startem),
+- podpisywanie obrazu i testowanie lancucha zaufania,
+- diagnostyka low-level (UART, GDB, HardFault, stack/heap),
+- budowa stabilnego firmware (FreeRTOS + LwIP + testy integracyjne).
+
+Pogladowe zdjecie stanowiska:
+
+![Stanowisko pet project](photo_2026-03-11_09-20-41.jpg)
 
 ---
 

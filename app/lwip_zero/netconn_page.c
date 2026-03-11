@@ -554,7 +554,7 @@ static void netconn_page_serve(struct netconn *conn)
   }
   else if (err == ERR_TIMEOUT)
   {
-    netconn_page_log_err("recv timeout", err);
+    /* Normal on some browsers that pre-open/idle connections. */
   }
   else if (err != ERR_CLSD)
   {

@@ -1,5 +1,7 @@
 # STM32 Secure Boot + FreeRTOS/LwIP (NUCLEO-H743ZI2)
 
+![STM32 Secure Boot Demo](photo_2026-03-11_09-20-41.jpg)
+
 Repozytorium zawiera zestaw firmware'ow edukacyjnych i testowych dla STM32H743:
 - secure bootloader,
 - kilka etapow aplikacji (`step1`, `step2`),

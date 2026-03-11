@@ -48,6 +48,8 @@
 #define ETH_RX_BUFFER_SIZE            1000U
 #define ETH_RX_BUFFER_CNT             12U
 #define ETH_TX_BUFFER_MAX             ((ETH_TX_DESC_CNT) * 2U)
+/* Debounce link state changes (5 * 100ms = 500ms). */
+#define ETH_LINK_DEBOUNCE_SAMPLES     5U
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
@@ -712,7 +714,9 @@ void ethernet_link_thread( void* argument )
 {
   ETH_MACConfigTypeDef MACConf = {0};
   int32_t PHYLinkState = 0U;
-  uint32_t linkchanged = 0U, speed = 0U, duplex = 0U;
+  uint32_t speed = 0U, duplex = 0U;
+  uint32_t link_up_samples = 0U;
+  uint32_t link_down_samples = 0U;
   struct netif *netif = (struct netif *) argument;
 
   for(;;)
@@ -720,14 +724,28 @@ void ethernet_link_thread( void* argument )
 
     PHYLinkState = LAN8742_GetLinkState(&LAN8742);
 
-    if(netif_is_link_up(netif) && (PHYLinkState <= LAN8742_STATUS_LINK_DOWN))
+    if (PHYLinkState > LAN8742_STATUS_LINK_DOWN)
+    {
+      link_up_samples++;
+      link_down_samples = 0U;
+    }
+    else
+    {
+      link_down_samples++;
+      link_up_samples = 0U;
+    }
+
+    if(netif_is_link_up(netif) && (link_down_samples >= ETH_LINK_DEBOUNCE_SAMPLES))
     {
       HAL_ETH_Stop_IT(&EthHandle);
       netifapi_netif_set_down(netif);
       netifapi_netif_set_link_down(netif);
+      link_down_samples = 0U;
     }
-    else if(!netif_is_link_up(netif) && (PHYLinkState > LAN8742_STATUS_LINK_DOWN))
+    else if(!netif_is_link_up(netif) && (link_up_samples >= ETH_LINK_DEBOUNCE_SAMPLES))
     {
+      uint32_t linkchanged = 0U;
+
       switch (PHYLinkState)
       {
       case LAN8742_STATUS_100MBITS_FULLDUPLEX:
@@ -764,6 +782,7 @@ void ethernet_link_thread( void* argument )
         HAL_ETH_Start_IT(&EthHandle);
         netifapi_netif_set_up(netif);
         netifapi_netif_set_link_up(netif);
+        link_up_samples = 0U;
       }
     }
 

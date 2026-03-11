@@ -12,7 +12,10 @@
 #include "lwip/tcpip.h"
 #include "app_ethernet.h"
 #include "netconn_page.h"
+#include "time_service.h"
 #include "uart_log.h"
+#include "FreeRTOS.h"
+#include "task.h"
 #include <stdio.h>
 
 struct netif gnetif;
@@ -65,6 +68,7 @@ int main(void)
   SystemClock_Config();
   BSP_Config();
   log_init();
+  time_service_init();
   log_puts("[BOOT] lwip_zero start\r\n");
 
   osKernelInitialize();
@@ -265,6 +269,29 @@ static void CPU_CACHE_Enable(void)
 void Error_Handler(void)
 {
   while (1)
+  {
+  }
+}
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+  char line[96];
+  const char *name = (pcTaskName != NULL) ? pcTaskName : "?";
+  (void)xTask;
+
+  (void)snprintf(line, sizeof(line), "[RTOS] Stack overflow: %s\r\n", name);
+  log_puts(line);
+  __disable_irq();
+  for (;;)
+  {
+  }
+}
+
+void vApplicationMallocFailedHook(void)
+{
+  log_puts("[RTOS] Malloc failed\r\n");
+  __disable_irq();
+  for (;;)
   {
   }
 }

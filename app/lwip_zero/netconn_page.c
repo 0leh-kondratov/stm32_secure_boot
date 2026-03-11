@@ -10,13 +10,21 @@
 #include "cmsis_os2.h"
 #include "app_ethernet.h"
 #include "main.h"
+#include "time_service.h"
 #include "uart_log.h"
 
 static struct netif *s_netif = NULL;
 static uint32_t s_page_hits = 0U;
 static uint8_t s_first_http_client_seen = 0U;
 static char s_last_client_ip[40] = "-";
+static char s_last_client_endpoint[48] = "-";
 static char s_last_client_agent[96] = "-";
+
+#define NETCONN_PAGE_BODY_MAX 1920U
+#define NETCONN_PAGE_HEAD_MAX 192U
+
+static char s_page_body[NETCONN_PAGE_BODY_MAX];
+static char s_page_head[NETCONN_PAGE_HEAD_MAX];
 
 static void netconn_page_log_err(const char *tag, err_t err)
 {
@@ -30,7 +38,6 @@ static void netconn_page_capture_client(struct netconn *conn)
   ip_addr_t peer_ip;
   u16_t peer_port = 0U;
   char ip_buf[40];
-  char line[96];
   err_t err;
 
   err = netconn_peer(conn, &peer_ip, &peer_port);
@@ -46,8 +53,7 @@ static void netconn_page_capture_client(struct netconn *conn)
   }
 
   (void)snprintf(s_last_client_ip, sizeof(s_last_client_ip), "%s", ip_buf);
-  (void)snprintf(line, sizeof(line), "[HTTP] Client %s:%u\r\n", ip_buf, (unsigned int)peer_port);
-  log_puts(line);
+  (void)snprintf(s_last_client_endpoint, sizeof(s_last_client_endpoint), "%s:%u", ip_buf, (unsigned int)peer_port);
 }
 
 static const char *netconn_page_detect_browser(const char *ua)
@@ -156,6 +162,8 @@ static void netconn_page_capture_user_agent(const void *req_buf, u16_t req_len)
   if (ua_tag == NULL)
   {
     (void)snprintf(s_last_client_agent, sizeof(s_last_client_agent), "Unknown / Unknown / Unknown");
+    (void)snprintf(line, sizeof(line), "[HTTP] Client %s - Agent Unknown | Unknown | Unknown\r\n", s_last_client_endpoint);
+    log_puts(line);
     return;
   }
 
@@ -193,14 +201,17 @@ static void netconn_page_capture_user_agent(const void *req_buf, u16_t req_len)
   device = netconn_page_detect_device(ua_value);
 
   (void)snprintf(s_last_client_agent, sizeof(s_last_client_agent), "%s / %s / %s", browser, os_name, device);
-  (void)snprintf(line, sizeof(line), "[HTTP] Agent %s | %s | %s\r\n", browser, os_name, device);
+  (void)snprintf(line, sizeof(line), "[HTTP] Client %s - Agent %s | %s | %s\r\n",
+                 s_last_client_endpoint, browser, os_name, device);
   log_puts(line);
 }
 
 static void netconn_page_send_index(struct netconn *conn)
 {
-  char body[1792];
-  char response[2176];
+  char time_text[40];
+  size_t body_len;
+  size_t head_len;
+  int n;
   err_t err;
   const ip4_addr_t *ip = netif_ip4_addr(s_netif);
   const char *ip_text = ip4addr_ntoa(ip);
@@ -222,58 +233,92 @@ static void netconn_page_send_index(struct netconn *conn)
     ip_text = "0.0.0.0";
   }
 
+  time_service_now_string(time_text, sizeof(time_text));
   s_page_hits++;
 
-  (void)snprintf(body, sizeof(body),
-                 "<!doctype html><html><head><meta charset=\"utf-8\">"
-                 "<meta http-equiv=\"refresh\" content=\"10\">"
-                 "<style>"
-                 "body{background:#000;color:#fff;font-family:Arial,sans-serif;}"
-                 "code{background:#222;color:#fff;padding:0 4px;}"
-                 "a{color:#8ab4ff;}"
-                 ".led-dot{display:inline-block;width:12px;height:12px;border:1px solid #666;"
-                 "border-radius:50%%;vertical-align:middle;margin-right:8px;}"
-                 "</style>"
-                 "<title>lwip_zero</title></head><body>"
-                 "<h2>STM32H743 Netconn demo</h2>"
-                 "<p>FreeRTOS + LwIP HTTP server is running.</p>"
-                 "<ul>"
-                 "<li>IP: %s</li>"
-                 "<li>MAC: %02X:%02X:%02X:%02X:%02X:%02X</li>"
-                 "<li>Last client IP: %s</li>"
-                 "<li>Last client agent: %s</li>"
-                 "<li><span class=\"led-dot\" style=\"background:%s;\"></span>"
-                 "<span style=\"color:%s;\">LED1: %s</span></li>"
-                 "<li><span class=\"led-dot\" style=\"background:%s;\"></span>"
-                 "<span style=\"color:%s;\">LED2: %s</span></li>"
-                 "<li><span class=\"led-dot\" style=\"background:%s;\"></span>"
-                 "<span style=\"color:%s;\">LED3: %s</span></li>"
-                 "<li>Page hits: %lu</li>"
-                 "</ul>"
-                 "<p>Route <code>/health</code> returns <code>OK</code>.</p>"
-                 "</body></html>",
-                 ip_text,
-                 (unsigned int)s_netif->hwaddr[0], (unsigned int)s_netif->hwaddr[1],
-                 (unsigned int)s_netif->hwaddr[2], (unsigned int)s_netif->hwaddr[3],
-                 (unsigned int)s_netif->hwaddr[4], (unsigned int)s_netif->hwaddr[5],
-                 s_last_client_ip,
-                 s_last_client_agent,
-                 led1_dot_color, led1_text_color, led1_text,
-                 led2_dot_color, led2_text_color, led2_text,
-                 led3_dot_color, led3_text_color, led3_text,
-                 (unsigned long)s_page_hits);
+  n = snprintf(s_page_body, sizeof(s_page_body),
+               "<!doctype html><html><head><meta charset=\"utf-8\">"
+               "<meta http-equiv=\"refresh\" content=\"10\">"
+               "<style>"
+               "body{background:#000;color:#fff;font-family:Arial,sans-serif;}"
+               "code{background:#222;color:#fff;padding:0 4px;}"
+               "a{color:#8ab4ff;}"
+               ".led-dot{display:inline-block;width:12px;height:12px;border:1px solid #666;"
+               "border-radius:50%%;vertical-align:middle;margin-right:8px;}"
+               "</style>"
+               "<title>lwip_zero</title></head><body>"
+               "<h2>STM32H743 Netconn demo</h2>"
+               "<p>FreeRTOS + LwIP HTTP server is running.</p>"
+               "<ul>"
+               "<li>IP: %s</li>"
+               "<li>MAC: %02X:%02X:%02X:%02X:%02X:%02X</li>"
+               "<li>Current time: %s</li>"
+               "<li>Last client IP: %s</li>"
+               "<li>Last client agent: %s</li>"
+               "<li><span class=\"led-dot\" style=\"background:%s;\"></span>"
+               "<span style=\"color:%s;\">LED1: %s</span></li>"
+               "<li><span class=\"led-dot\" style=\"background:%s;\"></span>"
+               "<span style=\"color:%s;\">LED2: %s</span></li>"
+               "<li><span class=\"led-dot\" style=\"background:%s;\"></span>"
+               "<span style=\"color:%s;\">LED3: %s</span></li>"
+               "<li>Page hits: %lu</li>"
+               "</ul>"
+               "<p>Route <code>/health</code> returns <code>OK</code>.</p>"
+               "</body></html>",
+               ip_text,
+               (unsigned int)s_netif->hwaddr[0], (unsigned int)s_netif->hwaddr[1],
+               (unsigned int)s_netif->hwaddr[2], (unsigned int)s_netif->hwaddr[3],
+               (unsigned int)s_netif->hwaddr[4], (unsigned int)s_netif->hwaddr[5],
+               time_text,
+               s_last_client_ip,
+               s_last_client_agent,
+               led1_dot_color, led1_text_color, led1_text,
+               led2_dot_color, led2_text_color, led2_text,
+               led3_dot_color, led3_text_color, led3_text,
+               (unsigned long)s_page_hits);
 
-  (void)snprintf(response, sizeof(response),
-                 "HTTP/1.1 200 OK\r\n"
-                 "Content-Type: text/html; charset=utf-8\r\n"
-                 "Cache-Control: no-store, no-cache, must-revalidate\r\n"
-                 "Pragma: no-cache\r\n"
-                 "Expires: 0\r\n"
-                 "Connection: close\r\n"
-                 "Content-Length: %u\r\n\r\n%s",
-                 (unsigned int)strlen(body), body);
+  if (n < 0)
+  {
+    body_len = 0U;
+  }
+  else if ((size_t)n >= sizeof(s_page_body))
+  {
+    body_len = sizeof(s_page_body) - 1U;
+  }
+  else
+  {
+    body_len = (size_t)n;
+  }
 
-  err = netconn_write(conn, response, strlen(response), NETCONN_COPY);
+  n = snprintf(s_page_head, sizeof(s_page_head),
+               "HTTP/1.1 200 OK\r\n"
+               "Content-Type: text/html; charset=utf-8\r\n"
+               "Cache-Control: no-store, no-cache, must-revalidate\r\n"
+               "Pragma: no-cache\r\n"
+               "Expires: 0\r\n"
+               "Connection: close\r\n"
+               "Content-Length: %lu\r\n\r\n",
+               (unsigned long)body_len);
+  if (n < 0)
+  {
+    return;
+  }
+  if ((size_t)n >= sizeof(s_page_head))
+  {
+    head_len = sizeof(s_page_head) - 1U;
+  }
+  else
+  {
+    head_len = (size_t)n;
+  }
+
+  err = netconn_write(conn, s_page_head, head_len, NETCONN_COPY);
+  if (err != ERR_OK)
+  {
+    netconn_page_log_err("write header failed", err);
+    return;
+  }
+  err = netconn_write(conn, s_page_body, body_len, NETCONN_COPY);
   if (err != ERR_OK)
   {
     netconn_page_log_err("write index failed", err);
@@ -418,5 +463,5 @@ static void netconn_page_thread(void *arg)
 void netconn_page_start(struct netif *netif)
 {
   s_netif = netif;
-  (void)sys_thread_new("HTTP", netconn_page_thread, NULL, DEFAULT_THREAD_STACKSIZE * 3, osPriorityAboveNormal);
+  (void)sys_thread_new("HTTP", netconn_page_thread, NULL, DEFAULT_THREAD_STACKSIZE * 4, osPriorityAboveNormal);
 }

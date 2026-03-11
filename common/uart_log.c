@@ -8,6 +8,7 @@
  */
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include "uart_log.h"
 
 #ifdef USE_HAL_DRIVER
@@ -20,12 +21,66 @@
 #endif
 
 #define LOG_UART_TIMEOUT_MS  20U
+#define LOG_TX_TMP_LEN       128U
 
 #ifdef USE_HAL_DRIVER
 
 /* --- HAL: USART2 (PA2/PA3) = ST-Link VCP, or USART3 (PD8/PD9) --- */
 static UART_HandleTypeDef hlog_uart;
 static uint8_t hlog_uart_ready = 0U;
+extern void time_service_now_string(char *out, size_t out_len) __attribute__((weak));
+
+static size_t log_format_with_timestamp(char *dst, size_t dst_len, const char *str)
+{
+  char wall_time[48];
+  uint32_t t_ms;
+  int n;
+  size_t off;
+  size_t copy_len;
+
+  if (dst == NULL || dst_len == 0U || str == NULL)
+  {
+    return 0U;
+  }
+
+  n = -1;
+  if (time_service_now_string != NULL)
+  {
+    wall_time[0] = '\0';
+    time_service_now_string(wall_time, sizeof(wall_time));
+    if (wall_time[0] != '\0' && strcmp(wall_time, "UNSYNCED") != 0)
+    {
+      n = snprintf(dst, dst_len, "[%s] ", wall_time);
+    }
+  }
+
+  if (n < 0)
+  {
+    t_ms = HAL_GetTick();
+    n = snprintf(dst, dst_len, "[%10lu ms] ", (unsigned long)t_ms);
+  }
+
+  if (n < 0)
+  {
+    return 0U;
+  }
+
+  off = (size_t)n;
+  if (off >= dst_len)
+  {
+    dst[dst_len - 1U] = '\0';
+    return dst_len - 1U;
+  }
+
+  copy_len = strlen(str);
+  if (copy_len > (dst_len - 1U - off))
+  {
+    copy_len = dst_len - 1U - off;
+  }
+  memcpy(&dst[off], str, copy_len);
+  dst[off + copy_len] = '\0';
+  return off + copy_len;
+}
 
 static HAL_StatusTypeDef log_uart_setup_instance(USART_TypeDef *instance)
 {
@@ -200,7 +255,11 @@ void log_puts(const char *str)
 
   if (xTaskGetSchedulerState() != taskSCHEDULER_RUNNING)
   {
-    log_uart_tx_blocking(str);
+    n = log_format_with_timestamp(msg.text, sizeof(msg.text), str);
+    if (n != 0U)
+    {
+      log_uart_tx_blocking(msg.text);
+    }
     return;
   }
 
@@ -208,34 +267,34 @@ void log_puts(const char *str)
 
   if (slog_queue == NULL)
   {
-    log_uart_tx_blocking(str);
+    n = log_format_with_timestamp(msg.text, sizeof(msg.text), str);
+    if (n != 0U)
+    {
+      log_uart_tx_blocking(msg.text);
+    }
     return;
   }
 
-  n = strlen(str);
-  if (n >= LOG_MSG_MAX_LEN)
-  {
-    n = LOG_MSG_MAX_LEN - 1U;
-  }
+  n = log_format_with_timestamp(msg.text, sizeof(msg.text), str);
   if (n == 0U)
   {
     return;
   }
-
-  memcpy(msg.text, str, n);
-  msg.text[n] = '\0';
   if (xQueueSend(slog_queue, &msg, 0U) != pdTRUE)
   {
     /* Keep critical logs even when queue is temporarily full. */
     log_uart_tx_blocking(msg.text);
   }
 #else
+  char line[LOG_TX_TMP_LEN];
+  size_t n;
+
   if (str == NULL || hlog_uart_ready == 0U || hlog_uart.gState != HAL_UART_STATE_READY)
     return;
-  size_t len = strlen(str);
-  if (len == 0)
+  n = log_format_with_timestamp(line, sizeof(line), str);
+  if (n == 0U)
     return;
-  (void)HAL_UART_Transmit(&hlog_uart, (const uint8_t *)str, (uint16_t)len, LOG_UART_TIMEOUT_MS);
+  (void)HAL_UART_Transmit(&hlog_uart, (const uint8_t *)line, (uint16_t)n, LOG_UART_TIMEOUT_MS);
 #endif
 }
 

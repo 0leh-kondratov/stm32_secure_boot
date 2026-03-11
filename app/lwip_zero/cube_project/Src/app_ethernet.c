@@ -25,6 +25,7 @@
 #include "ethernetif.h"
 #include "lwip/netifapi.h"
 #include "lwip/ip4_addr.h"
+#include "time_service.h"
 #include "uart_log.h"
 #include <stdio.h>
 
@@ -34,6 +35,7 @@
 /* Private variables ---------------------------------------------------------*/
 static volatile uint8_t s_led2_on = 0U;
 static volatile uint8_t s_led3_on = 0U;
+static int8_t s_last_link_up = -1;
 #if LWIP_DHCP
 #define MAX_DHCP_TRIES  4
 __IO uint8_t DHCP_state = DHCP_OFF;
@@ -105,8 +107,16 @@ static void ethernet_log_netif_addr(const char *prefix, const struct netif *neti
   */
 void ethernet_link_status_updated(struct netif *netif)
 {
-  if (netif_is_up(netif))
- {
+  const int8_t link_up = (netif_is_link_up(netif) != 0U) ? 1 : 0;
+
+  if (s_last_link_up == link_up)
+  {
+    return;
+  }
+  s_last_link_up = link_up;
+
+  if (link_up != 0)
+  {
     log_puts("[ETH] Link up\r\n");
 #if LWIP_DHCP
     /* Update DHCP state machine */
@@ -114,6 +124,7 @@ void ethernet_link_status_updated(struct netif *netif)
 #else
     ethernet_set_led((uint32_t)LED2, 1U);
     ethernet_set_led((uint32_t)LED3, 0U);
+    time_service_start();
 #endif /* LWIP_DHCP */
   }
   else
@@ -167,6 +178,7 @@ void DHCP_Thread(void* argument)
         {
           DHCP_state = DHCP_ADDRESS_ASSIGNED;
           ethernet_log_netif_addr("[DHCP] Assigned", netif);
+          time_service_start();
 
           ethernet_set_led((uint32_t)LED2, 1U);
           ethernet_set_led((uint32_t)LED3, 0U);
@@ -186,6 +198,7 @@ void DHCP_Thread(void* argument)
             IP_ADDR4(&gw, GW_ADDR0, GW_ADDR1, GW_ADDR2, GW_ADDR3);
             netifapi_netif_set_addr(netif, ip_2_ip4(&ipaddr), ip_2_ip4(&netmask), ip_2_ip4(&gw));
             ethernet_log_netif_addr("[DHCP] Timeout, static", netif);
+            time_service_start();
 
             ethernet_set_led((uint32_t)LED2, 1U);
             ethernet_set_led((uint32_t)LED3, 0U);
@@ -196,6 +209,7 @@ void DHCP_Thread(void* argument)
   case DHCP_LINK_DOWN:
     {
       DHCP_state = DHCP_OFF;
+      netifapi_dhcp_stop(netif);
 
       ethernet_set_led((uint32_t)LED2, 0U);
       ethernet_set_led((uint32_t)LED3, 1U);

@@ -43,13 +43,15 @@ LWIP_SRC = $(CUBE_LOCAL)/Middlewares/Third_Party/LwIP/src
 LWIP_API = $(LWIP_SRC)/api
 LWIP_CORE = $(LWIP_SRC)/core
 LWIP_NETIF = $(LWIP_SRC)/netif
+LWIP_APPS = $(LWIP_SRC)/apps
 LWIP_SYS = $(CUBE_LOCAL)/Middlewares/Third_Party/LwIP/system
 LWIP_ARCH = $(LWIP_SYS)/arch
 LWIP_IPV4 = $(LWIP_SRC)/core/ipv4
+LWIPOPTS_HDR = $(TOP)/app/lwip_zero/Inc/lwipopts.h
 STARTUP = $(CUBE_LOCAL)/Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/gcc/startup_stm32h743xx.s
 
 OBJ = $(BUILD)/startup.o \
-      $(BUILD)/main.o $(BUILD)/netconn_page.o $(BUILD)/uart_log.o $(BUILD)/ethernetif.o $(BUILD)/app_ethernet.o \
+      $(BUILD)/main.o $(BUILD)/netconn_page.o $(BUILD)/time_service.o $(BUILD)/uart_log.o $(BUILD)/ethernetif.o $(BUILD)/app_ethernet.o \
       $(BUILD)/stm32h7xx_it.o $(BUILD)/system_stm32h7xx.o $(BUILD)/stm32h7xx_hal_timebase_tim.o \
       $(BUILD)/tasks.o $(BUILD)/queue.o $(BUILD)/list.o $(BUILD)/timers.o $(BUILD)/event_groups.o $(BUILD)/stream_buffer.o \
       $(BUILD)/port.o $(BUILD)/heap_4.o $(BUILD)/cmsis_os2.o \
@@ -64,7 +66,7 @@ OBJ = $(BUILD)/startup.o \
       $(BUILD)/lwip_tcp.o $(BUILD)/lwip_tcp_in.o $(BUILD)/lwip_tcp_out.o $(BUILD)/lwip_udp.o $(BUILD)/lwip_netif.o \
       $(BUILD)/lwip_ip4.o $(BUILD)/lwip_etharp.o $(BUILD)/lwip_icmp.o $(BUILD)/lwip_dhcp.o $(BUILD)/lwip_acd.o $(BUILD)/lwip_timeouts.o \
       $(BUILD)/lwip_ip4_addr.o $(BUILD)/lwip_ip4_frag.o \
-      $(BUILD)/lwip_ethernet.o $(BUILD)/lwip_slip.o $(BUILD)/lwip_sys_arch.o
+      $(BUILD)/lwip_ethernet.o $(BUILD)/lwip_slip.o $(BUILD)/lwip_sys_arch.o $(BUILD)/lwip_sntp.o
 
 all: $(BUILD)/lwip_zero.elf $(BUILD)/lwip_zero.bin
 
@@ -77,6 +79,8 @@ $(BUILD)/startup.o: $(STARTUP) | $(BUILD)
 $(BUILD)/main.o: $(TOP)/app/lwip_zero/main.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/netconn_page.o: $(TOP)/app/lwip_zero/netconn_page.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/time_service.o: $(TOP)/app/lwip_zero/time_service.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/uart_log.o: $(TOP)/common/uart_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -221,6 +225,10 @@ $(BUILD)/lwip_slip.o: $(LWIP_NETIF)/slipif.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/lwip_sys_arch.o: $(LWIP_ARCH)/sys_arch.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/lwip_sntp.o: $(LWIP_APPS)/sntp/sntp.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/lwip_%.o: $(LWIPOPTS_HDR)
 
 $(BUILD)/lwip_zero.elf: $(OBJ) $(TOP)/app/lwip_zero/lwip_zero_h743zi.ld
 	$(LD) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS)

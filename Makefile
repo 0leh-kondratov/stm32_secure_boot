@@ -36,7 +36,7 @@ lwip:
 
 # New clean firmware profile: FreeRTOS + LwIP from scratch.
 lwip-zero:
-	$(MAKE) -f app/lwip_zero/Makefile all
+	$(MAKE) -f app/lwip_zero/Makefile all TOP="$(CURDIR)"
 
 # Stop st-util (and GDB) before flashing — ST-Link can only be used by one tool at a time.
 flash-lwip: lwip

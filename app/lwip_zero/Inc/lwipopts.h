@@ -6,13 +6,17 @@
 #ifndef __LWIPOPTS_H__
 #define __LWIPOPTS_H__
 
+#include <stdint.h>
+
+void time_service_set_epoch(uint32_t epoch_sec);
+
 #define NO_SYS 0
 
 #define MEM_ALIGNMENT 4
 #define MEM_SIZE (14 * 1024)
 #define LWIP_RAM_HEAP_POINTER (0x30004000)
 
-#define MEMP_NUM_SYS_TIMEOUT 6
+#define MEMP_NUM_SYS_TIMEOUT 12
 #define MEMP_NUM_TCP_PCB 10
 #define MEMP_NUM_TCP_SEG TCP_SND_QUEUELEN
 
@@ -30,7 +34,13 @@
 #define LWIP_ICMP 1
 #define LWIP_DHCP 1
 #define LWIP_UDP 1
+#define LWIP_DNS 1
+#define LWIP_SNTP 1
 #define UDP_TTL 255
+
+#define SNTP_SERVER_DNS 1
+#define SNTP_UPDATE_DELAY (15U * 60U * 1000U)
+#define SNTP_SET_SYSTEM_TIME(sec) time_service_set_epoch((uint32_t)(sec))
 
 #define LWIP_STATS 0
 

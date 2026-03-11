@@ -1,6 +1,6 @@
 # Secure Bootloader Makefile for STM32H743ZI (arm-none-eabi-gcc)
 # Default build: ECDSA stub (no mbedTLS). Use for first test.
-# For real signature verification, add mbedTLS and build with MBEDTLS=1 (see BUILD_RU.md).
+# For real signature verification, add mbedTLS and build with MBEDTLS=1 (see BUILD_PL.md).
 
 CC      = arm-none-eabi-gcc
 AS      = arm-none-eabi-as
@@ -16,7 +16,7 @@ BUILD   = build/bootloader
 LDFLAGS = -T bootloader/bootloader.ld -nostdlib -Wl,--gc-sections -Wl,-Map=$(BUILD)/bootloader.map
 
 # Debug build for GDB: -g -O0 (make -f bootloader/Makefile debug)
-# debug-clean: пересобрать с нуля с отладочными символами
+# debug-clean: odbuduj od podstaw za pomocą symboli debugowania
 debug: CFLAGS += -g -O0
 debug: all
 

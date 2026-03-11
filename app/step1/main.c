@@ -177,7 +177,7 @@ static void SystemClock_Config(void)
   while (!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
 
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  /* NUCLEO-H743ZI2: по умолчанию HSE от MCO ST-Link (8 MHz) — BYPASS. Если есть кварц на OSC — сменить на RCC_HSE_ON. */
+/* NUCLEO-H743ZI2: domyślny HSE z MCO ST-Link (8 MHz) to BYPASS. Jeśli na OSC jest kwarc, zmień na RCC_HSE_ON. */
   RCC_OscInitStruct.HSEState       = RCC_HSE_BYPASS;
   RCC_OscInitStruct.HSIState       = RCC_HSI_OFF;
   RCC_OscInitStruct.CSIState       = RCC_CSI_OFF;

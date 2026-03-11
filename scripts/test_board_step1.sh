@@ -1,14 +1,14 @@
 #!/bin/bash
-# Проверка работоспособности платы NUCLEO-H743ZI с прошивкой step1.
-# Ожидается: по UART каждые 2 с строка "Step 1: OK".
+# Sprawdzenie funkcjonalności płyty NUCLEO-H743ZI za pomocą oprogramowania sprzętowego step1.
+# Oczekiwano: przez UART co 2 s pojawia się wiersz „Krok 1: OK”.
 #
-# Использование:
-#   ./scripts/test_board_step1.sh              # плата уже прошита, порт /dev/ttyACM0
+# Użycie:
+# ./scripts/test_board_step1.sh # płyta jest już sflashowana, port /dev/ttyACM0
 #   ./scripts/test_board_step1.sh /dev/ttyUSB0
-#   ./scripts/test_board_step1.sh --flash      # сначала прошить, затем проверить
-#   ./scripts/test_board_step1.sh --no-reset   # не сбрасывать по ST-Link — нажать Reset вручную
+# ./scripts/test_board_step1.sh --flash # najpierw flashuj, potem przetestuj
+# ./scripts/test_board_step1.sh --no-reset # nie resetuj przez ST-Link - naciśnij Reset ręcznie
 #
-# Перед запуском закройте minicom/screen на том же порту.
+# Przed rozpoczęciem zamknij minicom/ekran na tym samym porcie.
 
 set -e
 cd "$(dirname "$0")/.."
@@ -46,7 +46,7 @@ if ! [ -f build/step1/step1.bin ]; then
   exit 1
 fi
 
-# Порт не должен быть занят другим процессом
+# Port nie może być zajęty przez inny proces
 if command -v lsof >/dev/null 2>&1; then
   if lsof "$DEV" 2>/dev/null | grep -q .; then
     echo "Warning: $DEV is open by another process (close minicom/screen/ide):"
@@ -57,7 +57,7 @@ fi
 
 stty -F "$DEV" 115200 raw -echo 2>/dev/null || { echo "Error: cannot set $DEV (close minicom/screen?)"; exit 1; }
 
-# Сброс платы через ST-Link (если есть st-info) или вручную
+# Zresetuj płytkę poprzez ST-Link (jeśli dostępne są informacje st.) lub ręcznie
 if [ -n "$NO_RESET" ]; then
   echo "Press RESET on the board, then press Enter here."
   read -r
@@ -67,7 +67,7 @@ elif command -v st-info >/dev/null 2>&1; then
   st-info --reset 2>/dev/null || true
   echo "Waiting 3 s for USB and firmware..."
   sleep 3
-  # После сброса порт может переподключиться — проверить снова
+# Po zresetowaniu port może się ponownie połączyć - sprawdź ponownie
   if ! [ -e "$DEV" ]; then
     echo "Error: $DEV disappeared after reset (USB re-enumeration?). Try: make test-board-step1 PORT=/dev/ttyACM1"
     echo "Or run: make test-board-step1 --no-reset  (then press RESET when asked)"

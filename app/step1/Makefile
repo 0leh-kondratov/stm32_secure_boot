@@ -125,7 +125,7 @@ clean:
 	@rm -f config-copied
 	rm -rf $(BUILD)
 
-# Сборка для Renode: HSI 64 MHz, без настройки HSE (early return в SystemClock_Config)
+# Kompilacja dla Renode: HSI 64 MHz, bez ustawień HSE (wcześniejszy powrót w SystemClock_Config)
 renode: clean-step1-main
 	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) all STEP1_RENODE=1 TOP="$(TOP)" CUBE_ROOT="$(CUBE_ROOT)"
 clean-step1-main:

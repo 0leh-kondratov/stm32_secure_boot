@@ -96,8 +96,8 @@ void BusFault_Handler(void)
 
 /**
   * @brief  This function handles Usage Fault exception.
-  *         В GDB: p/x g_usage_fault_cfsr — причина (UFSR в битах 16–31).
-  *         Адрес сбойной инструкции: x/xw $sp+24  затем  x/i <значение>
+* W GDB: p/x g_usage_fault_cfsr - przyczyna (UFSR w bitach 16-31).
+* Adres nieudanej instrukcji: x/xw $sp+24 następnie x/i <wartość>
   */
 static volatile uint32_t g_usage_fault_cfsr;
 

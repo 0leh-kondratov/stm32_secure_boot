@@ -99,7 +99,7 @@ clean:
 	@rm -f config-copied
 	rm -rf $(BUILD)
 
-# Сборка для Renode: раз в 5 с вывод status и переключение LED3 (обход бага UART RX в Renode, issue #487)
+# Kompilacja dla Renode: co 5 s status wyjścia i przełącznik LED3 (obejście błędu UART RX w Renode, wydanie #487)
 renode: clean-main
 	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) all DEMO_RENODE=1 TOP="$(TOP)" CUBE_ROOT="$(CUBE_ROOT)"
 clean-main:

@@ -1,13 +1,13 @@
-# step1.resc — эмуляция step1 (FreeRTOS: Logger + LED + App) на STM32H743 в Renode
-# Образ для Renode: make step1-renode → build/step1/step1.elf (HSI 64 MHz, без HSE).
-# Обычная сборка make step1 — для платы (HSE 400 MHz); в Renode будет тишина (HSE не эмулируется).
+# step1.resc — emulacja step1 (FreeRTOS: Logger + LED + app) na STM32H743 w Renode
+# Obraz dla Renode: utwórz step1-renode → build/step1/step1.elf (HSI 64 MHz, bez HSE).
+# Normalna kompilacja zrób krok 1 — dla tablicy (HSE 400 MHz); w Renode będzie cisza (HSE nie jest emulowany).
 #
-# Запуск из корня проекта:
+# Uruchamianie od korzenia projektu:
 #   renode step1.resc
-# Без GUI: renode --disable-gui step1.resc
+# Bez GUI: renode --disable-gui step1.resc
 #
-# Ожидаемый вывод в usart3: каждые 2 с строка "Step 1: OK", LED1 (PB0) мигает раз в 500 мс.
-# Доп. RAM 0x1FE00000 нужен для xTaskCreate (как в demo).
+# Oczekiwane wyjście w usart3: co 2 s wiersz "Krok 1: OK", dioda LED1 (PB0) miga raz na 500 ms.
+# Dodatkowa pamięć ram 0x1FE00000 jest potrzebna do xTaskCreate (jak w wersji demonstracyjnej).
 #
 # GDB: machine StartGdbServer 3334 → (gdb) target remote :3334
 

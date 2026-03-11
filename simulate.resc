@@ -1,30 +1,30 @@
-# simulate.resc — эмуляция бутлоадера на STM32H743 в Renode
+# simulate.resc — emulacja bootloadera na STM32H743 w Renode
 #
-# Запуск из корня проекта (после сборки бутлоадера и подписанного приложения):
+# Uruchomienie z korzenia projektu (po zmontowaniu bootloadera i podpisanej aplikacji):
 #   make -f bootloader/Makefile all
 #   make signed-app
 #   renode simulate.resc
 #
-# Без signed_app по 0x08010000 бутлоадер выдаст "FAIL: bad magic" и остановится.
-# Вывод UART — в окне "usart3".
+# Bez podpisanej_aplikacji na 0x08010000, bootloader zwróci "fail: bad magic" i zatrzyma się.
+# wyjście UART — w oknie „usart3”.
 
 using sysbus
 mach create "stm32h7"
 machine LoadPlatformDescription @platforms/cpus/stm32h743.repl
 
-# Бутлоадер в начало flash
+# Bootloader na początku flasha
 sysbus LoadELF @build/bootloader/bootloader.elf
 
-# Подписанное приложение по 0x08010000 (заголовок + образ) — иначе verify_signature: bad magic
+# Podpisana aplikacja na 0x08010000 (nagłówek + obraz) — w przeciwnym razie Verify_signature: zła magia
 sysbus LoadBinary @build/app/signed_app.bin 0x08010000
 
 showAnalyzer usart3
 
-# GDB-сервер на порту 3333 — подключиться: (gdb) target remote :3333
-# Затем можно ставить breakpoint, monitor start, continue
+# Serwer GDB na porcie 3333 — connect: (gdb) target remote :3333
+# Następnie możesz umieścić pułapkę, rozpocząć monitorowanie, kontynuować
 machine StartGdbServer 3333
 
-# Меньше шума от нереализованных регистров RCC/peripheral
+# Mniejszy hałas z niezrealizowanych rejestrów RCC/rejestrów peryferyjnych
 logLevel 3
 
 start

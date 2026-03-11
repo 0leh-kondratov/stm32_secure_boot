@@ -70,6 +70,7 @@ void time_service_set_epoch(uint32_t epoch_sec);
 #define LWIP_NETCONN 1
 #define LWIP_SOCKET 0
 #define LWIP_NETIF_API 1
+#define LWIP_SO_RCVTIMEO 1
 
 #define TCPIP_THREAD_NAME "TCP/IP"
 #define TCPIP_THREAD_STACKSIZE 2048

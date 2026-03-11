@@ -1,7 +1,7 @@
 #!/bin/bash
-# Проверка сборки всех целей без прошивки.
-# Запуск: ./scripts/build_all.sh
-# Выход: 0 — всё собралось, иначе первый код ошибки.
+# Sprawdzanie montażu wszystkich celów bez oprogramowania sprzętowego.
+# Uruchom: ./scripts/build_all.sh
+# Wyjście: 0 - wszystko zadziałało, w przeciwnym razie pierwszy kod błędu.
 
 set -e
 cd "$(dirname "$0")/.."

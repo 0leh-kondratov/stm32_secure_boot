@@ -1,15 +1,15 @@
-В проекте два демо-образа (от простого к сложному):
+Projekt zawiera dwa obrazy demonstracyjne (od prostych do złożonych):
 
-1) Официальный шаблон STM32CubeH7 (рабочий, только мигание LED)
-   Сборка:   make demo-official
-   Прошивка: make flash-demo-official
-   Нужен клон STM32CubeH7 рядом: ../STM32CubeH7 (или CUBE_ROOT=...).
+1) Oficjalny szablon STM32CubeH7 (działa, tylko miga dioda LED)
+Kompilacja: utwórz wersję demonstracyjną jako oficjalną
+Oprogramowanie układowe: udostępnij wersję flash-demo jako oficjalną
+Potrzebujesz klona STM32CubeH7 w pobliżu: ../STM32CubeH7 (lub CUBE_ROOT=...).
 
-2) Минимальный образ проекта: 3 LED + лог в UART
-   Сборка:   make demo
-   Результат: build_demo/demo.bin
-   Прошивка: st-flash write build_demo/demo.bin 0x08000000
-   UART: USART3 (PD8/PD9), 115200 8N1. В логе: LED1=ON/OFF и т.д.
+2) Minimalny obraz projektu: 3 diody LED + log UART
+Kompilacja: utwórz wersję demonstracyjną
+Wynik: build_demo/demo.bin
+Oprogramowanie układowe: zapis st-flash build_demo/demo.bin 0x08000000
+UART: USART3 (PD8/PD9), 115200 8N1. W logu: LED1=ON/OFF itd.
 
-   Эмуляция в Renode: make demo && renode demo.resc (из корня проекта).
-   Лог — окно usart3. GDB: порт 3334.
+Emulacja w Renode: utwórz demo i ponownie wykonaj demo.resc (z katalogu głównego projektu).
+Log - okno usart3. GDB: port 3334.

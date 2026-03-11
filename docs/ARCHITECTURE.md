@@ -1,54 +1,54 @@
-# Архитектура проекта STM32 Secure Boot
+# Architektura projektu STM32 Secure Boot
 
-Проект разделён на две части: **Bootloader (Secure Boot)** и **Application (Ethernet + LCD + FreeRTOS)**.
+Projekt podzielony jest na dwie części: **Bootloader (Secure Boot)** i **Aplikacja (Ethernet + LCD + FreeRTOS)**.
 
 ---
 
 ## 1. Bootloader (Secure Boot)
 
-- **Расположение во Flash:** `0x08000000` — первые 64 KB.
-- **Назначение:**
-  - Инициализация HAL, тактов, UART (логирование).
-  - Проверка подписи приложения (ECDSA P-256 над SHA-256 образа).
-  - При успехе — переход в Application (`Jump_To_Application`).
-  - При ошибке — индикация (LED) и останов.
-- **Проверка подписи:** SHA-256 по региону приложения (HAL HASH или прямой доступ к HASH), верификация ECDSA (mbedTLS или заглушка `USE_ECDSA_STUB`). На платах с PKA возможна замена на `HAL_PKA_VerifySignature` (см. комментарии в `bootloader/src/main.c`).
-- **Сборка:** `make bootloader` → `build/bootloader/bootloader.bin`. Прошивка в `0x08000000`.
+- **Lokalizacja Flasha:** `0x08000000` - pierwsze 64 KB.
+- **Zamiar:**
+- Inicjalizacja HAL, zegarów, UART (logowanie).
+- Weryfikacja podpisu aplikacji (ECDSA P-256 na obrazie SHA-256).
+- Jeśli się powiedzie, przejdź do aplikacji („Jump_To_Application”).
+- W przypadku błędu - sygnalizacja (LED) i zatrzymanie.
+- **Weryfikacja podpisu:** SHA-256 według regionu aplikacji (HAL HASH lub bezpośredni dostęp do HASH), weryfikacja ECDSA (mbedTLS lub stub `USE_ECDSA_STUB`). Na płytach z PKA możliwe jest zastąpienie go przez `HAL_PKA_VerifySignature` (patrz komentarze w `bootloader/src/main.c`).
+- **Kompilacja:** `utwórz bootloader` → `build/bootloader/bootloader.bin`. Oprogramowanie sprzętowe w `0x08000000`.
 
 ---
 
 ## 2. Application (Ethernet + LCD + FreeRTOS)
 
-- **Расположение во Flash:** образ с заголовком с `0x08010000` (или при необходимости с `0x08020000` — см. `memory_map.h` и скрипт подписи).
-- **Назначение:**
-  - Сеть: LwIP (Ethernet) + DHCP, при необходимости HTTPS (mbedTLS + LwIP altcp_tls).
-  - Дисплей: I2C LCD 1602 (адрес 0x27), задача `lcd_monitor_task` обновляет IP и статус.
-  - ОС: FreeRTOS + CMSIS-RTOS V2.
-- **Перед стартом планировщика:** опциональная проверка целостности (SHA-256 по образу прошивки, например по региону `0x08020000` или текущему образу) через HAL HASH.
-- **Сборка:** `make lwip` (или отдельный target Application с полным списком модулей) → образ для прошивки после заголовка (подписанный — `make signed-app`).
+- **Lokalizacja Flash:** obraz z nagłówkiem z `0x08010000` (lub jeśli to konieczne z `0x08020000` - zobacz `memory_map.h` i skrypt podpisu).
+- **Zamiar:**
+- Sieć: LwIP (Ethernet) + DHCP, w razie potrzeby HTTPS (mbedTLS + LwIP altcp_tls).
+- Wyświetlacz: I2C LCD 1602 (adres 0x27), zadanie `lcd_monitor_task` aktualizuje IP i status.
+- System operacyjny: FreeRTOS + CMSIS-RTOS V2.
+- **Przed uruchomieniem harmonogramu:** opcjonalna kontrola integralności (SHA-256 według obrazu oprogramowania sprzętowego, na przykład według regionu `0x08020000` lub bieżącego obrazu) poprzez HAL HASH.
+- **Kompilacja:** `make lwip` (lub oddzielna aplikacja docelowa z pełną listą modułów) → obraz oprogramowania sprzętowego po nagłówku (podpisany - `make Signed-app`).
 
 ---
 
-## 3. Разделение памяти (пример)
+## 3. Udostępnianie pamięci (przykład)
 
-| Область        | Адрес        | Размер   | Описание                    |
+| Region | Adres | Rozmiar | Opis |
 |----------------|--------------|----------|-----------------------------|
 | Bootloader     | 0x08000000   | 64 KB    | Secure Boot                  |
-| App header+code| 0x08010000   | до 2MB   | Заголовок + приложение      |
-| SRAM (DMA ETH) | 0x30040000   | по MPU   | Дескрипторы LwIP (SRAM3)    |
+| Nagłówek aplikacji+kod| 0x08010000 | do 2MB | Tytuł + aplikacja |
+| SRAM (DMA ETH) | 0x30040000 | przez MPU | Deskryptory LwIP (SRAM3) |
 | Heap FreeRTOS  | —            | ≥ 128 KB | configTOTAL_HEAP_SIZE       |
 
 ---
 
-## 4. Поток загрузки
+## 4. Przebieg ładowania
 
-1. Сброс → выполнение Bootloader.
-2. Bootloader: проверка подписи образа приложения.
-3. При успехе: `Jump_To_Application(entry_point)` (VTOR, MSP, переход на Reset_Handler приложения).
-4. Application: HAL init, часы, опционально SHA-256 целостности, BSP, инициализация ядра FreeRTOS, создание задач (LwIP, LCD, HTTPS и т.д.), `osKernelStart()`.
+1. Zresetuj → uruchomiony program ładujący.
+2. Bootloader: weryfikacja podpisu obrazu aplikacji.
+3. Jeśli się powiedzie: `Jump_To_Application(entry_point)` (VTOR, MSP, przejdź do Reset_Handler aplikacji).
+4. Aplikacja: init HAL, zegar, opcjonalna integralność SHA-256, BSP, inicjalizacja jądra FreeRTOS, tworzenie zadań (LwIP, LCD, HTTPS itp.), `osKernelStart()`.
 
 ---
 
-## 5. Список файлов для Makefile
+## 5. Lista plików Makefile
 
-См. **docs/MAKEFILE_FILES_LIST.md** — пути к Core/HAL (Ethernet, I2C, HASH, PKA при наличии), LwIP, FreeRTOS, mbedTLS.
+Zobacz **docs/MAKEFILE_FILES_LIST.md** - ścieżki do Core/HAL (Ethernet, I2C, HASH, PKA jeśli są dostępne), LwIP, FreeRTOS, mbedTLS.

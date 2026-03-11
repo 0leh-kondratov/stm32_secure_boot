@@ -70,7 +70,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
     GPIO_InitStruct.Pin       = I2Cx_SCL_PIN | I2Cx_SDA_PIN;
     GPIO_InitStruct.Mode      = GPIO_MODE_AF_OD;
 #if I2Cx_GPIO_PULLUP
-    GPIO_InitStruct.Pull      = GPIO_PULLUP;   /* внутренние подтяжки, если на шине нет внешних */
+GPIO_InitStruct.Pull = GPIO_PULLUP;   /* nawiasy wewnętrzne, jeśli na magistrali nie ma zewnętrznych */
 #else
     GPIO_InitStruct.Pull      = GPIO_NOPULL;
 #endif

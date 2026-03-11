@@ -1,59 +1,59 @@
-# demo.resc — эмуляция standalone demo (FreRTOS, 3 LEDe + UART) на STM32H743 в Renode
-# Исходники: app/demo. Сборка: make demo → build/demo/demo.elf
+# demo.resc — samodzielna emulacja demo (FreRTOS, 3 LEDe + UART) na STM32H743 w Renode
+# Źródła: app/demo. Build: make demo → build/demo/demo.elf
 #
-# Проверка эмуляции без бутлоадера и подписи. Образ тот же, что прошивается make flash-demo.
+# Kontrola emulacji bez bootloadera i podpisu. Obraz jest taki sam jak zeszyty make flash-demo.
 #
-# Запуск из корня проекта:
+# Uruchamianie od korzenia projektu:
 #   make demo-renode
 #   renode demo.resc
-# (make demo-renode — образ с автокомандами раз в 5 с: status + переключение LED3; иначе в Renode команды по telnet не работают из-за бага UART RX, renode#487.)
-# Без GUI: renode --disable-gui demo.resc
+# (make demo-renode — obraz z automatycznymi poleceniami co 5 s: status + przełączanie LED3; w przeciwnym razie polecenia telnet nie działają w Renode z powodu błędu UART RX, renoda#487.)
+# Bez GUI: renode --disable-gui demo.resc
 #
-# В окне usart3: "Demo UART OK", приглашение "FreeRTOS interactive...", затем раз в 5 с — статус LED и LED3 on/off (auto).
-# На плате (make demo + flash-demo): telnet не нужен, команды вводятся по UART (help, led3 on и т.д.).
+# W oknie usart3: „demo UART OK”, zaproszenie „FreeRTOS interactive…”, następnie co 5 sekund — stan włączenia/wyłączenia LED i LED3 (auto).
+# Na płycie (make demo + flash-demo): telnet nie jest potrzebny, polecenia są wprowadzane przez UART (pomoc, dioda LED3 włączona itp.).
 #
 # --- GDB ---
-# Подключение во втором терминале:
+# Podłączenie w drugim zacisku:
 #   arm-none-eabi-gdb build/demo/demo.elf
 #   (gdb) target remote :3334
 #   (gdb) break main
 #   (gdb) continue
-# Или в Cursor: запустить renode demo.resc, затем F5 → конфигурация "Debug demo (Renode)".
+# Lub w Cursor: uruchom renode demo.resc, a następnie → konfigurację F5 "Debug demo (Renode)".
 #
-# --- Состояние LED в Renode ---
-# 1) В окне usart3 идёт лог: LED1=ON LED2=OFF LED3=OFF и т.д.
-# 2) LED на NUCLEO active-low: в ODR 0 = горит, 1 = погашен.
+# --- LED Status w Renode ---
+# 1) W oknie usart3 znajduje się dziennik: LED1=ON LED2=OFF LED3=OFF, itp.
+# 2) dioda LED na NUCLEO active-low: w ODR 0 = wł., 1 = wył.
 #    (machine-0) sysbus ReadDoubleWord 0x58020414
-#    → GPIOB ODR: бит 0 = LED1 (PB0), бит 14 = LED3 (PB14)
+#    → GPIOB ODR: bit 0 = LED1 (PB0), bit 14 = LED3 (PB14)
 #    (machine-0) sysbus ReadDoubleWord 0x58021014
-#    → GPIOE ODR: бит 1 = LED2 (PE1)
-#    LED включён, если соответствующий бит ODR == 0.
+#    → GPIOE ODR: bit 1 = LED2 (PE1)
+#    dioda LED jest włączona, jeśli odpowiedni bit ODR == 0.
 #
-# Лог Renode: 0=Noisy, 1=Debug, 2=Info, 3=Warning, 4=Error, 5=NoLog.
-# logLevel 4 — только ошибки; скрывает WARNING (rcc, 0x2007FFxx, FMC, GPV).
-# Для отладки: logLevel 0 или 1.
+# Renode log: 0=Noisy, 1=Debug, 2=Info, 3=Warning, 4=Error, 5=NoLog.
+# logLevel 4 — tylko błędy; ukrywa OSTRZEŻENIE (rcc, 0x2007FFxx, FMC, GPV).
+# Do debugowania: logLevel 0 lub 1.
 
 using sysbus
 logLevel 3
 mach create "stm32h7"
 machine LoadPlatformDescription @platforms/cpus/stm32h743.repl
 
-# Workaround: при xTaskCreate FreeRTOS пишет по 0x1FEADB00; в repl нет RAM по этому адресу — подключаем доп. область из .repl (в resc нельзя \n в строке)
-# Доп. RAM 0x1FE00000 (workaround для xTaskCreate). Путь: из корня проекта или полный, напр. @/data/projects/stm32_secure_boot/demo_ram_extra.repl
+# Obejście: gdy xTaskCreate FreeRTOS pisze na 0x1FEADB00; w REPL nie ma pamięci RAM pod tym adresem — łączymy dodatkowy obszar z .repl (w resc jest to niemożliwe \n w wierszu)
+# Dodatkowa pamięć ram 0x1FE00000 (obejście dla xTaskCreate). Ścieżka: z katalogu głównego projektu lub pełna, np. @/data/projects/stm32_secure_boot/demo_ram_extra.repl
 machine LoadPlatformDescription @demo_ram_extra.repl
 
-# Standalone demo по 0x08000000 (тот же образ, что прошивается на плату без бутлоадера)
+# Samodzielne demo 0x08000000 (ten sam obraz, który jest wszyty na płytę bez bootloadera)
 sysbus LoadELF @build/demo/demo.elf
 
-# Вывод в окно Renode
+Okno # Output to Renode
 showAnalyzer usart3
 
-# Ввод с клавиатуры: сокет-терминал на порту 12345. Подключиться: telnet localhost 12345 (или nc localhost 12345)
-# Тогда ввод (help, led3 on и т.д.) попадёт в эмулированный UART.
+# Wejście klawiatury: Gniazdo na porcie 12345. Połącz: telnet localhost 12345 (lub nc localhost 12345)
+# Następnie wejście (pomoc, dioda LED3 włączona itp.) przejdzie do emulowanego UART.
 emulation CreateServerSocketTerminal 12345 "uart_term" false
 connector Connect sysbus.usart3 uart_term
 
-# GDB-сервер на порту 3334 — подключиться: (gdb) target remote :3334
+# Serwer GDB na porcie 3334 — połączenie: (gdb) pilot docelowy:3334
 machine StartGdbServer 3334
 
 start

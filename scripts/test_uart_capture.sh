@@ -1,7 +1,7 @@
 #!/bin/bash
-# Тест вывода минимального бутлоадера в UART.
-# Закройте minicom. Запустите: ./scripts/test_uart_capture.sh
-# По запросу нажмите Reset на плате и сразу Enter — скрипт покажет захваченный вывод.
+# Przetestuj wyjście minimalnego programu ładującego w UART.
+# Zamknij minicom. Uruchom: ./scripts/test_uart_capture.sh
+# Gdy zostaniesz o to poproszony, naciśnij Reset na tablicy i natychmiast Enter – skrypt wyświetli przechwycone dane wyjściowe.
 
 set -e
 cd "$(dirname "$0")/.."

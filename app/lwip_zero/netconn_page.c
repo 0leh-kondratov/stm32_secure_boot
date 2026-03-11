@@ -21,10 +21,23 @@ static char s_last_client_endpoint[48] = "-";
 static char s_last_client_agent[96] = "-";
 
 #define NETCONN_PAGE_BODY_MAX 1920U
-#define NETCONN_PAGE_HEAD_MAX 192U
+#define NETCONN_PAGE_HEAD_MAX 320U
+#define NETCONN_PAGE_REQ_MAX 512U
+#define NETCONN_PAGE_REQ_LINE_MAX 128U
+#define NETCONN_PAGE_RECV_TIMEOUT_MS 2000U
 
 static char s_page_body[NETCONN_PAGE_BODY_MAX];
 static char s_page_head[NETCONN_PAGE_HEAD_MAX];
+
+typedef enum
+{
+  NETCONN_PAGE_REQ_BAD = 0,
+  NETCONN_PAGE_REQ_ROOT,
+  NETCONN_PAGE_REQ_HEALTH,
+  NETCONN_PAGE_REQ_NOT_FOUND,
+  NETCONN_PAGE_REQ_METHOD_NOT_ALLOWED,
+  NETCONN_PAGE_REQ_TOO_LARGE
+} netconn_page_req_t;
 
 static void netconn_page_log_err(const char *tag, err_t err)
 {
@@ -206,6 +219,80 @@ static void netconn_page_capture_user_agent(const void *req_buf, u16_t req_len)
   log_puts(line);
 }
 
+static netconn_page_req_t netconn_page_parse_request(const char *buf, u16_t buflen)
+{
+  size_t line_len = 0U;
+  size_t method_len = 0U;
+  size_t path_start;
+  size_t path_end;
+  size_t path_len;
+
+  if (buf == NULL || buflen == 0U)
+  {
+    return NETCONN_PAGE_REQ_BAD;
+  }
+  if (buflen >= NETCONN_PAGE_REQ_MAX)
+  {
+    return NETCONN_PAGE_REQ_TOO_LARGE;
+  }
+
+  while (line_len < (size_t)buflen && line_len < NETCONN_PAGE_REQ_LINE_MAX)
+  {
+    if (buf[line_len] == '\r' || buf[line_len] == '\n')
+    {
+      break;
+    }
+    line_len++;
+  }
+
+  if (line_len < 8U || line_len >= NETCONN_PAGE_REQ_LINE_MAX)
+  {
+    return NETCONN_PAGE_REQ_BAD;
+  }
+
+  while (method_len < line_len && buf[method_len] != ' ')
+  {
+    method_len++;
+  }
+  if (method_len == 0U || method_len >= line_len)
+  {
+    return NETCONN_PAGE_REQ_BAD;
+  }
+
+  if (method_len != 3U || strncmp(buf, "GET", 3) != 0)
+  {
+    return NETCONN_PAGE_REQ_METHOD_NOT_ALLOWED;
+  }
+
+  path_start = method_len + 1U;
+  if (path_start >= line_len || buf[path_start] != '/')
+  {
+    return NETCONN_PAGE_REQ_BAD;
+  }
+
+  path_end = path_start;
+  while (path_end < line_len && buf[path_end] != ' ')
+  {
+    path_end++;
+  }
+  if (path_end >= line_len)
+  {
+    return NETCONN_PAGE_REQ_BAD;
+  }
+
+  path_len = path_end - path_start;
+  if (path_len == 1U && buf[path_start] == '/')
+  {
+    return NETCONN_PAGE_REQ_ROOT;
+  }
+  if (path_len == 7U && strncmp(&buf[path_start], "/health", 7) == 0)
+  {
+    return NETCONN_PAGE_REQ_HEALTH;
+  }
+
+  return NETCONN_PAGE_REQ_NOT_FOUND;
+}
+
 static void netconn_page_send_index(struct netconn *conn)
 {
   char time_text[40];
@@ -293,6 +380,9 @@ static void netconn_page_send_index(struct netconn *conn)
   n = snprintf(s_page_head, sizeof(s_page_head),
                "HTTP/1.1 200 OK\r\n"
                "Content-Type: text/html; charset=utf-8\r\n"
+               "X-Content-Type-Options: nosniff\r\n"
+               "X-Frame-Options: DENY\r\n"
+               "Referrer-Policy: no-referrer\r\n"
                "Cache-Control: no-store, no-cache, must-revalidate\r\n"
                "Pragma: no-cache\r\n"
                "Expires: 0\r\n"
@@ -342,6 +432,58 @@ static void netconn_page_send_health(struct netconn *conn)
   }
 }
 
+static void netconn_page_send_400(struct netconn *conn)
+{
+  static const char response[] =
+      "HTTP/1.1 400 Bad Request\r\n"
+      "Content-Type: text/plain\r\n"
+      "Connection: close\r\n"
+      "Content-Length: 11\r\n\r\n"
+      "Bad Request";
+  err_t err;
+
+  err = netconn_write(conn, response, sizeof(response) - 1U, NETCONN_COPY);
+  if (err != ERR_OK)
+  {
+    netconn_page_log_err("write 400 failed", err);
+  }
+}
+
+static void netconn_page_send_405(struct netconn *conn)
+{
+  static const char response[] =
+      "HTTP/1.1 405 Method Not Allowed\r\n"
+      "Allow: GET\r\n"
+      "Content-Type: text/plain\r\n"
+      "Connection: close\r\n"
+      "Content-Length: 18\r\n\r\n"
+      "Method Not Allowed";
+  err_t err;
+
+  err = netconn_write(conn, response, sizeof(response) - 1U, NETCONN_COPY);
+  if (err != ERR_OK)
+  {
+    netconn_page_log_err("write 405 failed", err);
+  }
+}
+
+static void netconn_page_send_413(struct netconn *conn)
+{
+  static const char response[] =
+      "HTTP/1.1 413 Payload Too Large\r\n"
+      "Content-Type: text/plain\r\n"
+      "Connection: close\r\n"
+      "Content-Length: 17\r\n\r\n"
+      "Payload Too Large";
+  err_t err;
+
+  err = netconn_write(conn, response, sizeof(response) - 1U, NETCONN_COPY);
+  if (err != ERR_OK)
+  {
+    netconn_page_log_err("write 413 failed", err);
+  }
+}
+
 static void netconn_page_send_404(struct netconn *conn)
 {
   static const char response[] =
@@ -364,32 +506,55 @@ static void netconn_page_serve(struct netconn *conn)
   struct netbuf *inbuf = NULL;
   void *buf = NULL;
   u16_t buflen = 0;
+  netconn_page_req_t req = NETCONN_PAGE_REQ_BAD;
   err_t err;
 
   err = netconn_recv(conn, &inbuf);
   if (err == ERR_OK && inbuf != NULL)
   {
     netbuf_data(inbuf, &buf, &buflen);
-    netconn_page_capture_user_agent(buf, buflen);
-    if (buf != NULL && buflen >= 5U && strncmp((const char *)buf, "GET /", 5) == 0)
+
+    if (buf == NULL || buflen == 0U)
     {
-      if (strncmp((const char *)buf, "GET /health", 11) == 0)
-      {
-        netconn_page_send_health(conn);
-      }
-      else if (strncmp((const char *)buf, "GET / ", 6) == 0)
-      {
-        netconn_page_send_index(conn);
-      }
-      else
-      {
-        netconn_page_send_404(conn);
-      }
+      netconn_page_send_400(conn);
     }
     else
     {
-      netconn_page_send_404(conn);
+      req = netconn_page_parse_request((const char *)buf, buflen);
+      if (req == NETCONN_PAGE_REQ_ROOT || req == NETCONN_PAGE_REQ_HEALTH)
+      {
+        netconn_page_capture_user_agent(buf, buflen);
+      }
+
+      if (req == NETCONN_PAGE_REQ_ROOT)
+      {
+        netconn_page_send_index(conn);
+      }
+      else if (req == NETCONN_PAGE_REQ_HEALTH)
+      {
+        netconn_page_send_health(conn);
+      }
+      else if (req == NETCONN_PAGE_REQ_NOT_FOUND)
+      {
+        netconn_page_send_404(conn);
+      }
+      else if (req == NETCONN_PAGE_REQ_METHOD_NOT_ALLOWED)
+      {
+        netconn_page_send_405(conn);
+      }
+      else if (req == NETCONN_PAGE_REQ_TOO_LARGE)
+      {
+        netconn_page_send_413(conn);
+      }
+      else
+      {
+        netconn_page_send_400(conn);
+      }
     }
+  }
+  else if (err == ERR_TIMEOUT)
+  {
+    netconn_page_log_err("recv timeout", err);
   }
   else if (err != ERR_CLSD)
   {
@@ -442,6 +607,7 @@ static void netconn_page_thread(void *arg)
     if (err == ERR_OK && conn != NULL)
     {
       netconn_page_capture_client(conn);
+      netconn_set_recvtimeout(conn, NETCONN_PAGE_RECV_TIMEOUT_MS);
       if (s_first_http_client_seen == 0U)
       {
         s_first_http_client_seen = 1U;

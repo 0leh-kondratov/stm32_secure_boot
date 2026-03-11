@@ -20,13 +20,13 @@ signed-app: app
 minimal:
 	$(MAKE) -f bootloader/Makefile minimal
 
-# Сборка бутлоадера с отладочными символами для GDB (-g -O0)
+# Zespół Bootloadera z symbolami debugowania dla GDB (-g -O0)
 debug:
 	$(MAKE) -f bootloader/Makefile debug
 
 demo:
 	$(MAKE) -f app/demo/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
-# Demo для Renode: автокоманды раз в 5 с (обход бага UART RX в эмуляторе)
+# Demo dla Renode: polecenia automatyczne raz na 5 s (z pominięciem błędu UART RX w emulatorze)
 demo-renode:
 	$(MAKE) -f app/demo/Makefile renode CUBE_ROOT="$(CUBE_ROOT)" TOP="$(CURDIR)"
 
@@ -45,7 +45,7 @@ flash-lwip: lwip
 flash-lwip-zero: lwip-zero
 	st-flash write build/lwip_zero/lwip_zero.bin 0x08000000 || (echo "Hint: stop st-util (Ctrl+C in that terminal) and retry"; exit 255)
 
-# Прошить standalone demo (FreeRTOS, LED+UART) в 0x08000000
+# Autonomiczne demo Flash (FreeRTOS, LED+UART) w 0x08000000
 flash-demo: demo
 	st-flash write build/demo/demo.bin 0x08000000
 
@@ -61,7 +61,7 @@ demo-official:
 flash-demo-official: demo-official
 	st-flash write "$(CUBE_ROOT)/Projects/NUCLEO-H743ZI/Templates/build/Templates.bin" 0x08000000
 
-# Step 1: FreeRTOS Logger + LED + App. Для платы — пересобрать main.o, startup.o, system (без STEP1_RENODE).
+# Krok 1: Rejestrator FreeRTOS + LED + aplikacja. Dla planszy — przebuduj main.o, startup.o, system (bez STEP1_RENODE).
 step1:
 	@rm -f build/step1/main.o build/step1/startup.o build/step1/system_stm32h7xx.o
 	$(MAKE) -f app/step1/Makefile all CUBE_ROOT="$(CUBE_ROOT)"
@@ -69,28 +69,28 @@ step1:
 flash-step1: step1
 	st-flash write build/step1/step1.bin 0x08000000
 
-# Полная очистка Flash, затем прошивка step1 (плата в начальное состояние)
+# Pełne czyszczenie pamięci flash, a następnie oprogramowanie sprzętowe kroku 1 (płyta do stanu początkowego)
 erase-flash-step1: step1
 	st-flash erase
 	st-flash write build/step1/step1.bin 0x08000000
 
-# Проверка платы: UART должен выводить "Step 1: OK". Порт: make test-board-step1 PORT=/dev/ttyUSB0
+# Kontrola płyty: UART powinien wysyłać "Krok 1: OK". Port: make test-board-step1 PORT=/dev/ttyUSB0
 test-board-step1:
 	@$(if $(PORT),./scripts/test_board_step1.sh $(PORT),./scripts/test_board_step1.sh)
 
-# То же с ручным сбросом (нажать Reset по запросу) — если после st-info порт не отдаёт данные
+# To samo z ręcznym resetem (naciśnij Reset na żądanie) — jeśli port nie zwraca danych po st-info
 test-board-step1-no-reset:
 	./scripts/test_board_step1.sh --no-reset
 
-# С прошивкой перед проверкой: make test-board-step1-flash
+# Z oprogramowaniem układowym przed sprawdzeniem: wykonaj test-board-step1-flash
 test-board-step1-flash:
 	./scripts/test_board_step1.sh --flash
 
-# Step1 в Renode: сборка образа для эмуляции (HSI 64 MHz, без HSE) + подсказка запуска
+# Step1 in Renode: build an image for emulation (HSI 64 MHz, no HSE) + start prompt
 step1-renode:
 	$(MAKE) -f app/step1/Makefile renode CUBE_ROOT="$(CUBE_ROOT)" TOP="$(CURDIR)"
 	@echo "Run: renode step1.resc"
-	@echo "  UART: usart3 / telnet localhost 12345 — ожидается \"Step 1: OK\" каждые 2 с."
+@echo "  UART: usart3 / telnet localhost 12345 — oczekiwany \"Krok 1: OK\" co 2 sekundy."
 
 # Step 2: FreeRTOS + Logger + LED + I2C scanner (scan result to UART log).
 step2:

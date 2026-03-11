@@ -1,6 +1,6 @@
 /*
  * Minimal standalone demo: 3 LEDs + UART log (LED state).
- * NUCLEO-H743ZI2 (MB1364): LED1=PB0, LED2=PE1, LED3=PB14 (цвета зависят от платы).
+* NUCLEO-H743ZI2 (MB1364): LED1=PB0, LED2=PE1, LED3=PB14 (kolory zależą od płytki).
  * UART: USART3 PD8/PD9, 115200. Flash at 0x08000000. Build: make demo.
  */
 #include <stdint.h>

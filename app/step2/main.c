@@ -228,7 +228,7 @@ static void MX_I2C1_Init(void)
 {
   GPIO_InitTypeDef g = {0};
 
-  /* Сброс I2C перед инициализацией (на случай зависшей шины после сброса платы) */
+/* Zresetuj I2C przed inicjalizacją (w przypadku zablokowania magistrali po zresetowaniu płyty) */
   __HAL_RCC_I2C1_FORCE_RESET();
   for (volatile int i = 0; i < 100; i++) { (void)i; }
   __HAL_RCC_I2C1_RELEASE_RESET();
@@ -248,7 +248,7 @@ static void MX_I2C1_Init(void)
   HAL_GPIO_Init(I2Cx_GPIO_PORT, &g);
 
   hi2c1.Instance             = I2Cx;
-  /* Timing: 0x10909CEC ≈ 100 kHz при 200 MHz APB1; при 100 MHz APB1 получится ~50 kHz — оба варианта валидны для I2C */
+/* Taktowanie: 0x10909CEC ≈ 100 kHz przy 200 MHz APB1; przy 100 MHz APB1 otrzymujesz ~50 kHz - obie opcje obowiązują dla I2C */
   hi2c1.Init.Timing          = 0x10909CEC;
   hi2c1.Init.OwnAddress1     = 0;
   hi2c1.Init.AddressingMode  = I2C_ADDRESSINGMODE_7BIT;

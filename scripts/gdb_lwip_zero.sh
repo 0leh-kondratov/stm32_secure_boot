@@ -1,7 +1,7 @@
 #!/bin/bash
-# Отладка app/lwip_zero на плате NUCLEO-H743ZI2 (STM32H743).
-# Перед запуском в другом терминале: st-util
-# Нужен arm-none-eabi-gdb (не системный gdb для x86).
+# Debugowanie app/lwip_zero na płycie NUCLEO-H743ZI2 (STM32H743).
+# Przed uruchomieniem w innym terminalu: st-util
+# Potrzebujesz arm-none-eabi-gdb (nie systemowego gdb dla x86).
 
 BOARD="NUCLEO-H743ZI2"
 cd "$(dirname "$0")/.."
@@ -9,16 +9,16 @@ ELF="${ELF:-build/lwip_zero/lwip_zero.elf}"
 GDB="${GDB:-arm-none-eabi-gdb}"
 
 if ! command -v "$GDB" &>/dev/null; then
-  echo "Ошибка: $GDB не найден. Установите: sudo apt install gcc-arm-none-eabi"
+echo „Błąd: nie znaleziono $GDB. Zainstaluj: sudo apt install gcc-arm-none-eabi”
   exit 1
 fi
 
 if [ ! -f "$ELF" ]; then
-  echo "Соберите образ: make lwip-zero"
+echo "Zbuduj obraz: zrób lwip-zero"
   exit 1
 fi
 
-echo "Плата: $BOARD (STM32H743)"
+echo "Płyta: $BOARD (STM32H743)"
 echo "GDB:   $GDB ($(command -v "$GDB"))"
 echo "ELF:   $ELF"
 echo "---"
@@ -58,7 +58,7 @@ printf "stacked: r0=0x%08x r1=0x%08x r2=0x%08x r3=0x%08x r12=0x%08x\n", $fault_r
 x/i $fault_pc
 x/8wx $fault_sp
 backtrace
-printf "--- (остановка в HardFault, смотри регистры/стек)\n"
+printf "--- (zatrzymaj w HardFault, zobacz rejestry/stos)\n"
 end
 
 break UsageFault_Handler
@@ -67,7 +67,7 @@ silent
 printf "--- UsageFault_Handler ---\n"
 info registers
 backtrace
-printf "--- (остановка в UsageFault, смотри регистры/стек)\n"
+printf "--- (zatrzymany w UsageFault, zobacz rejestry/stos)\n"
 end
 GDBEOF
 

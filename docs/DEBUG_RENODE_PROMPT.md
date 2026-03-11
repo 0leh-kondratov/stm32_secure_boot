@@ -1,22 +1,22 @@
-# Промпт для отладки: Demo FreeRTOS в Renode
+# Monit o debugowanie: Demo FreeRTOS w Renode
 
-Используй этот блок как контекст при отладке ситуации «демо в Renode останавливается после части сообщений UART».
-
----
-
-## Контекст
-
-- **Проект:** stm32_secure_boot. Standalone demo: FreeRTOS, 3 LED (PB0, PE1, PB14), UART (USART3, 115200). Плата: NUCLEO-H743ZI2.
-- **Сборка для Renode:** `make demo-renode` → `build/demo/demo.elf` (макрос `DEMO_RENODE_AUTO_CMD`: без system_stm32h7xx, busy-wait вместо vTaskDelay в задаче LED, статическое создание LED-задачи через `xTaskCreateStatic`).
-- **Запуск:** из корня проекта `renode demo.resc`; UART в окне usart3 и по `telnet localhost 12345`.
-- **Ожидаемый вывод в UART:**  
-  `[DBG] Demo start` → `[DBG] clock 64M (renode)` → `[DBG] leds_init...` → `[DBG] GPIO ok` → `[DBG] Demo OK` → `[DBG] creating LED task...` → `[DBG] before xTaskCreateStatic` → `[DBG] after xTaskCreateStatic` → `[DBG] xTaskCreate done` → `[DBG] LED task ok` → `[DBG] start sched` → `[DBG] LED task running` → далее циклически `[LED] LED1 on` / `LED2 on` / `LED3 on`.
+Użyj tego bloku jako kontekstu podczas debugowania sytuacji „demo w Renode zatrzymuje się po części komunikatów UART”.
 
 ---
 
-## Симптом (для вставки в промпт)
+## Kontekst
 
-Вывод в Renode (usart3 / telnet) обрывается, например после:
+- **Projekt:** stm32_secure_boot. Samodzielne demo: FreeRTOS, 3 diody LED (PB0, PE1, PB14), UART (USART3, 115200). Płytka: NUCLEO-H743ZI2.
+- **Kompilacja dla Renode:** `make demo-renode` → `build/demo/demo.elf` (makro `DEMO_RENODE_AUTO_CMD`: bez system_stm32h7xx, busy-wait zamiast vTaskDelay w zadaniu LED, statyczne tworzenie zadania LED poprzez `xTaskCreateStatic`).
+- **Uruchom:** z katalogu głównego projektu `renode demo.resc`; UART w oknie usart3 i poprzez `telnet localhost 12345`.
+- **Oczekiwane wyjście w UART:**
+`[DBG] Start demonstracji` → `[DBG] zegar 64M (renode)` → `[DBG] leds_init...` → `[DBG] GPIO ok` → `[DBG] Demo OK` → `[DBG] tworzenie zadania LED...` → `[DBG] przed xTaskCreateStatic` → `[DBG] po xTaskCreateStatic` → `[DBG] xTaskCreate zakończone` → `[DBG] LED zadanie ok` → `[DBG] start harmonogram` → `[DBG] LED zadanie uruchomione` → następnie cyklicznie `[LED] LED1 włączona` / `LED2 włączona` / `LED3 włączona`.
+
+---
+
+## Objaw (do wstawienia do zachęty)
+
+Dane wyjściowe w Renode (usart3/telnet) ulegają awarii, na przykład po:
 
 ```
 [DBG] Demo start
@@ -27,110 +27,110 @@
 [DBG] creating LED task...
 ```
 
-Дальше ничего не появляется (нет `xTaskCreate done`, `LED task ok`, `start sched`, `LED task running`, `[LED] LED1 on` и т.д.). В логе Renode могут быть предупреждения вида `WriteDoubleWord to non existing peripheral at 0x1FEADB00` или по адресам 0x2007FFxx.
+Następnie nic się nie pojawia (żadnych komunikatów: „xTaskCreate zakończone”, „LED zadanie OK”, „rozpocznij harmonogram”, „LED zadanie uruchomione”, „[LED] LED1 włączona” itp.). Dziennik Renode może zawierać ostrzeżenia, takie jak „WriteDoubleWord do nieistniejącego urządzenia peryferyjnego pod adresem 0x1FEADB00” lub pod adresami 0x2007FFxx.
 
 ---
 
-## Что уже сделано в проекте
+## Co zostało już zrobione w projekcie
 
-1. **RAM 128K** в `app/demo/demo.ld` — чтобы стек и .bss не выходили за пределы области, которую Renode отображает (dtcm 0x20000000).
-2. **Доп. RAM в Renode** — `demo_ram_extra.repl`: область 0x1FE00000, 1 MiB; подключается в `demo.resc` через `machine LoadPlatformDescription @demo_ram_extra.repl` (обход записей по 0x1FEADB00 при инициализации стека задачи).
-3. **Для сборки Renode** LED-задача создаётся через **xTaskCreateStatic** (стек и TCB в .bss в `main_freertos.c`), без вызова `pvPortMalloc` при создании задачи.
-4. **FreeRTOSConfig.h:** `configSUPPORT_STATIC_ALLOCATION 1`, `configKERNEL_PROVIDED_STATIC_MEMORY 1` — idle-задача использует встроенную в ядро память.
-5. В `common/uart_log.c` при `DEMO_RENODE_AUTO_CMD`: не используется `SystemD2Clock`; в `log_puts` при не запущенном планировщике — busy-wait вместо `vTaskDelay`.
+1. **RAM 128K** w `app/demo/demo.ld` - tak aby stos i .bss nie wychodziły poza obszar mapowany przez Renode (dtcm 0x20000000).
+2. **Dodaj. RAM w Renode** - `demo_ram_extra.repl`: obszar 0x1FE00000, 1 MiB; łączy się z `demo.resc` poprzez `machine LoadPlatformDescription @demo_ram_extra.repl` (pomijając wpisy pod adresem 0x1FEADB00 podczas inicjowania stosu zadań).
+3. **W przypadku budowania Renode** zadanie LED jest tworzone poprzez **xTaskCreateStatic** (stos i TCB w .bss w `main_freertos.c`), bez wywoływania `pvPortMalloc` podczas tworzenia zadania.
+4. **FreeRTOSConfig.h:** `configSUPPORT_STATIC_ALLOCATION 1`, `configKERNEL_PROVIDED_STATIC_MEMORY 1` - bezczynne zadanie wykorzystuje pamięć wbudowaną w jądro.
+5. W `common/uart_log.c` z `DEMO_RENODE_AUTO_CMD`: `SystemD2Clock` nie jest używany; w `log_puts`, gdy harmonogram nie jest uruchomiony - busy-wait zamiast `vTaskDelay`.
 
-Ключевые файлы: `app/demo/main_freertos.c`, `app/demo/FreeRTOSConfig.h`, `app/demo/demo.ld`, `demo.resc`, `demo_ram_extra.repl`, `common/uart_log.c`.
+Pliki kluczy: `app/demo/main_freertos.c`, `app/demo/FreeRTOSConfig.h`, `app/demo/demo.ld`, `demo.resc`, `demo_ram_extra.repl`, `common/uart_log.c`.
 
 ---
 
-## Промпт для отладки (скопировать и при необходимости дополнить)
+## Monit o debugowanie (skopiuj i dodaj, jeśli to konieczne)
 
 ```
-Контекст: проект stm32_secure_boot, standalone demo на FreeRTOS для STM32H743. Образ для эмуляции Renode собирается командой make demo-renode (build/demo/demo.elf), запуск: renode demo.resc, UART — usart3 / telnet localhost 12345.
+Kontekst: projekt stm32_secure_boot, samodzielne demo na FreeRTOS dla STM32H743. Obraz do emulacji Renode składa się za pomocą polecenia make demo-renode (build/demo/demo.elf), uruchom: renode demo.resc, UART - usart3 / telnet localhost 12345.
 
-Проблема: в Renode вывод по UART обрывается после строки "[DBG] creating LED task...". Не появляются "[DBG] xTaskCreate done", "LED task ok", "start sched", "LED task running" и "[LED] LED1 on" и т.д.
+Problem: w Renode wyjście UART zostaje odcięte po linii „[DBG] tworzenie zadania LED…”. Komunikaty „[DBG] xTaskCreate zakończone”, „LED zadanie ok”, „rozpocznij harmonogram”, „LED zadanie uruchomione” i „[LED] LED1 włączone” itp. nie pojawiają się.
 
-В проекте уже сделано: линкер 128K RAM; подключён demo_ram_extra.repl (RAM 0x1FE00000); для Renode LED-задача создаётся через xTaskCreateStatic (стек/TCB в .bss); configSUPPORT_STATIC_ALLOCATION и configKERNEL_PROVIDED_STATIC_MEMORY включены.
+W projekcie już zrobione: linker 128K RAM; demo_ram_extra.repl jest podłączony (RAM 0x1FE00000); w przypadku Renode zadanie LED jest tworzone poprzez xTaskCreateStatic (stos/TCB w .bss); configSUPPORT_STATIC_ALLOCATION i configKERNEL_PROVIDED_STATIC_MEMORY są włączone.
 
-Нужно:
-1. По последнему выведённому сообщению определить, где выполнение останавливается (до/внутри/после xTaskCreateStatic, до/после vTaskStartScheduler, в задаче LED или в log_puts).
-2. Предложить минимальные изменения для локализации (доп. log_puts, брейкпоинты, проверка адресов в Renode).
-3. Проверить, что для сборки Renode действительно используется xTaskCreateStatic и что стек/TCB лежат в .bss (адреса в 0x2000xxxx), а не в куче.
-4. Если есть подозрение на Renode (память, периферия) — предложить точечные проверки в мониторе Renode (sysbus, cpu) или правки demo.resc / .repl.
+Potrzebować:
+1. Na podstawie ostatniego wyświetlonego komunikatu określ miejsce zatrzymania wykonywania (przed/wewnątrz/po xTaskCreateStatic, przed/po vTaskStartScheduler, w zadaniu LED lub w log_puts).
+2. Zaproponuj minimalne zmiany w lokalizacji (dodatkowe log_puts, breakpointy, sprawdzenie adresów w Renode).
+3. Sprawdź, czy do zbudowania Renode faktycznie użyto xTaskCreateStatic i czy stos/TCB znajduje się w pliku .bss (adresy w 0x2000xxxx), a nie na stercie.
+4. Jeśli podejrzewasz Renode (pamięć, urządzenia peryferyjne), zasugeruj sprawdzenie na monitorze Renode (sysbus, cpu) lub edytuj demo.resc / .repl.
 ```
 
 ---
 
-## Быстрые проверки
+## Szybkie kontrole
 
-| Проверка | Команда / место |
+| Sprawdź | Zespół/miejsce |
 |----------|------------------|
-| Образ для Renode собран | `make demo-renode` без ошибок, есть `build/demo/demo.elf` |
-| В образе используется статическая задача | В `main_freertos.c` при `DEMO_RENODE_AUTO_CMD` вызывается `xTaskCreateStatic` с `led_stack`, `led_tcb` |
-| Адрес кучи / .bss в допустимой области | `arm-none-eabi-nm build/demo/demo.elf \| grep -E "ucHeap|_ebss|_estack|led_stack|led_tcb"` — адреса в 0x2000xxxx, _estack = 0x20020000 |
-| Подключён ram_extra в Renode | В `demo.resc` есть `machine LoadPlatformDescription @demo_ram_extra.repl` (путь корректен) |
-| GDB к Renode | Запустить renode demo.resc, затем `arm-none-eabi-gdb build/demo/demo.elf` → `target remote :3334` → `break main` / break в `xTaskCreateStatic` / в `task_led_cycle` → `continue` |
+| Obraz dla Renode jest złożony | `zrób demo-renode` bez błędów, jest `build/demo/demo.elf` |
+| Obraz wykorzystuje zadanie statyczne | W `main_freertos.c` z `DEMO_RENODE_AUTO_CMD` wywoływane jest `xTaskCreateStatic` z `led_stack`, `led_tcb` |
+| Adres sterty/.bss w prawidłowym obszarze | `arm-none-eabi-nm build/demo/demo.elf \| grep -E "ucHeap|_ebss|_estack|led_stack|led_tcb"` - adresy pod adresem 0x2000xxxx, _estack = 0x20020000 |
+| Podłączony ram_extra w Renode | W `demo.resc` znajduje się `machine LoadPlatformDescription @demo_ram_extra.repl` (ścieżka jest poprawna) |
+| GDB do ponownego przetworzenia | Uruchom renode demo.resc, następnie `arm-none-eabi-gdb build/demo/demo.elf` → `target Remote :3334` → `break main` / przerwa w `xTaskCreateStatic` / w `task_led_cycle` → `kontynuuj` |
 
 ---
 
-## Если нужно передать контекст другой сессии
+## Jeśli chcesz przekazać kontekst do innej sesji
 
-Добавь к промпту:
+Dodaj do zachęty:
 
-- Точный последний вывод из usart3/telnet (скопировать).
-- Последние строки лога Renode (WARNING/ERROR), если есть.
-- Версию Renode: `renode --version`.
-- Уточнение: после изменений (xTaskCreateStatic, ram_extra) поведение не изменилось или изменилось (например, появились новые сообщения).
+- Dokładne ostatnie wyjście z usart3/telnet (kopia).
+- Ostatnie wiersze dziennika Renode (OSTRZEŻENIE/BŁĄD), jeśli istnieją.
+- Wersja ponownego przetworzenia: `renode --wersja`.
+- Wyjaśnienie: po zmianach (xTaskCreateStatic, ram_extra) zachowanie nie uległo zmianie ani zmianie (na przykład pojawiły się nowe wiadomości).
 
 ---
 
-## Результаты отладки (выполнение промпта)
+## Wyniki debugowania (wykonanie monitu)
 
-### 1. Где останавливается выполнение
+### 1. Miejsce zatrzymania wykonywania
 
-По последнему выведенному сообщению **"[DBG] creating LED task..."** выполнение останавливается **внутри вызова xTaskCreateStatic** — до вывода "[DBG] xTaskCreate done". То есть зависание происходит в одной из веток:
+Na podstawie ostatniego wyświetlonego komunikatu **„[DBG] tworzenie zadania LED…”** wykonywanie zostaje zatrzymane **wewnątrz wywołania xTaskCreateStatic** - aż do wyświetlenia komunikatu „[DBG] xTaskCreate zakończone”. Oznacza to, że zawieszenie występuje w jednej z gałęzi:
 
-- `prvCreateStaticTask` (memset TCB, присвоение pxStack, вызов prvInitialiseNewTask);
-- `prvInitialiseNewTask` (инициализация стека через pxPortInitialiseStack, копирование имени задачи, списки);
-- `prvAddNewTaskToReadyList` (добавление задачи в готовые списки).
+- `prvCreateStaticTask` (memset TCB, przypisanie pxStack, wywołanie prvInitialiseNewTask);
+- `prvInitialiseNewTask` (inicjalizacja stosu poprzez pxPortInitialiseStack, kopiowanie nazw zadań, listy);
+- `prvAddNewTaskToReadyList` (dodanie zadania do gotowych list).
 
-### 2. Диагностика в коде
+### 2. Diagnostyka w kodzie
 
-В `main_freertos.c` добавлены точечные сообщения:
+Dodano wiadomości z kropkami do `main_freertos.c`:
 
-- **`[DBG] before xTaskCreateStatic`** — непосредственно перед вызовом `xTaskCreateStatic`;
-- **`[DBG] after xTaskCreateStatic`** — сразу после вызова.
+- **`[DBG] przed xTaskCreateStatic`** - bezpośrednio przed wywołaniem `xTaskCreateStatic`;
+- **`[DBG] po xTaskCreateStatic`** - zaraz po wywołaniu.
 
-Интерпретация в Renode:
+Interpretacja w Renode:
 
-- Видны "creating LED task..." и "before xTaskCreateStatic", но **нет** "after xTaskCreateStatic" → зависание внутри `xTaskCreateStatic` (ядро FreeRTOS или порт).
-- Видны "before" и "after" → зависание позже (например, в следующем `log_puts` или в `vTaskStartScheduler`).
+- „tworzenie zadania LED…” i „przed xTaskCreateStatic” są widoczne, ale **nie** „po xTaskCreateStatic” → zawiesza się wewnątrz `xTaskCreateStatic` (jądro lub port FreeRTOS).
+- Widoczne „przed” i „po” → zawieś później (np. w następnych `log_puts` lub w `vTaskStartScheduler`).
 
-Для сужения места остановки в GDB можно ставить брейкпоинты: `prvCreateStaticTask`, `prvInitialiseNewTask`, `prvAddNewTaskToReadyList`, `pxPortInitialiseStack`.
+Aby zawęzić punkt zatrzymania w GDB, możesz ustawić punkty przerwania: `prvCreateStaticTask`, `prvInitialiseNewTask`, `prvAddNewTaskToReadyList`, `pxPortInitialiseStack`.
 
-### 3. Проверка адресов (стек/TCB в .bss)
+### 3. Sprawdzanie adresu (stos/TCB w .bss)
 
-Команда (после `make demo-renode`):
+Polecenie (po `make demo-renode`):
 
 ```bash
 arm-none-eabi-nm build/demo/demo.elf | grep -E "ucHeap|_ebss|_estack|led_stack|led_tcb"
 ```
 
-Ожидаемый вид (все адреса в диапазоне 0x2000xxxx):
+Oczekiwany widok (wszystkie adresy z zakresu 0x2000xxxx):
 
-| Символ      | Адрес     | Комментарий        |
+| Symbol | Adres | Komentarz |
 |-------------|-----------|---------------------|
-| _ebss       | 0x20002bec| конец .bss          |
-| _estack     | 0x20020000| верх стека (128K RAM) |
-| led_stack.* | 0x20000070| стек LED-задачи в .bss |
-| led_tcb.*   | 0x20000014| TCB LED-задачи в .bss |
-| ucHeap      | 0x20000be4| куча в .bss         |
+| _ebs | 0x20002bec| koniec .bss |
+| _estack | 0x20020000| szczyt stosu (128K RAM) |
+| led_stack.* | 0x20000070| Stos zadań LED w pliku .bss |
+| led_tcb.* | 0x20000014| Zadania LED TCB w pliku .bss |
+| uSterta | 0x20000be4| sterta w .bss |
 
-Вывод подтверждает: для сборки Renode используется `xTaskCreateStatic`, стек и TCB лежат в .bss (0x2000xxxx), не в куче.
+Wynik potwierdza: Do zbudowania Renode użyto `xTaskCreateStatic`, stos i TCB znajdują się w .bss (0x2000xxxx), a nie na stercie.
 
-### 4. Проверки в мониторе Renode
+### 4. Sprawdza monitor Renode
 
-- Убедиться, что подключён `demo_ram_extra.repl`: в `demo.resc` есть `machine LoadPlatformDescription @demo_ram_extra.repl` (запуск из корня проекта).
-- Проверить доступ к RAM по 0x20000000 (размер не меньше 128K): в мониторе Renode после `start` выполнить, например:  
-  `sysbus ReadDoubleWord 0x20000000` — не должно быть ошибки доступа.
-- При появлении WARNING о записи по 0x1FEADB00 или 0x2007FFxx — проверить, что 0x1FE00000 отображается через `demo_ram_extra.repl`; адреса 0x2007FFxx выходят за 128K (0x20020000) и в текущем линкере не используются.
+- Upewnij się, że `demo_ram_extra.repl` jest podłączony: w `demo.resc` znajduje się `machine LoadPlatformDescription @demo_ram_extra.repl` (uruchamiany z katalogu głównego projektu).
+- Sprawdź dostęp do pamięci RAM pod adresem 0x20000000 (rozmiar nie mniejszy niż 128K): w monitorze Renode po `start` wykonaj na przykład:
+`sysbus ReadDoubleWord 0x20000000` - nie powinno być żadnego błędu dostępu.
+- Gdy pojawi się OSTRZEŻENIE dotyczące rekordu pod adresem 0x1FEADB00 lub 0x2007FFxx, sprawdź, czy w pliku `demo_ram_extra.repl` jest wyświetlane 0x1FE00000; adresy 0x2007FFxx przekraczają 128 KB (0x20020000) i nie są używane w bieżącym linkerze.

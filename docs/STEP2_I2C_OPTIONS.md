@@ -1,101 +1,101 @@
-# Варианты инициализации I2C (step2, NUCLEO-H743ZI)
+# Opcje inicjalizacji I2C (krok 2, NUCLEO-H743ZI)
 
-## Сравнение с NUCLEO-F207ZG (Data brief / Nucleo-144)
+## Porównanie z NUCLEO-F207ZG (Krótkie dane / Nucleo-144)
 
-По [Data brief Nucleo-144](https://www.st.com/resource/en/data_brief/nucleo-f207zg.pdf) платы **NUCLEO-F207ZG** и **NUCLEO-H743ZI** входят в одну линейку (Nucleo-144) и для части плат используют **один и тот же User Manual UM1974** (референс платы **MB1137**).
+Według [Data brief Nucleo-144] (https://www.st.com/resource/en/data_brief/nukleo-f207zg.pdf), płyty **NUCLEO-F207ZG** i **NUCLEO-H743ZI** wchodzą w skład tej samej linii (Nucleo-144), a w przypadku niektórych płytek używana jest **ta sama instrukcja obsługi UM1974** (odniesienie do płyty **MB1137**).
 
-### Где I2C на плате
+### Gdzie jest I2C na płycie
 
-- **На разъёме CN8** (нижняя левая часть платы) **I2C по умолчанию не выведен**.
-- **I2C выведен на разъём CN7** (ST Zio / Arduino-совместимый):
+- **Na złączu CN8** (lewa dolna część płytki) **I2C nie jest domyślnie włączone**.
+- **I2C jest wyprowadzane na złącze CN7** (kompatybilne z ST Zio / Arduino):
 
-| Сигнал | Пин Zio | Физический пин MCU | Расположение на плате |
+| Sygnał | Przypnij Zio | Fizyczny pin MCU | Lokalizacja na pokładzie |
 |--------|---------|---------------------|------------------------|
-| **SCL** | D15 | **PB8** | CN7, пин 2 (верхний правый) |
-| **SDA** | D14 | **PB9** | CN7, пин 4 (второй сверху справа) |
+| **SCL** | D15 | **PB8** | CN7, pin 2 (prawy górny róg) |
+| **SDA** | D14 | **PB9** | CN7, pin 4 (drugi od góry po prawej) |
 
-Подключать I2C-модуль (LCD и т.п.) нужно к **CN7**, а не к CN8.
+Musisz podłączyć moduł I2C (LCD itp.) do **CN7**, a nie do CN8.
 
-### Сопоставление с step2
+### Mapowanie do kroku 2
 
-| Параметр | NUCLEO-F207ZG | NUCLEO-H743ZI (step2) |
+| Parametr | NUCLEO-F207ZG | NUCLEO-H743ZI (krok 2) |
 |----------|----------------|------------------------|
-| **МК** | STM32F207ZGT6 (Cortex-M3, 120 MHz) | STM32H743ZIT6 (Cortex-M7, 400 MHz) |
-| **I2C на CN7** | I2C1: **PB8 (SCL), PB9 (SDA)** | То же при `I2Cx_USE_PB8_PB9 1` |
-| **Альтернатива (Morpho)** | — | PB6 (SCL), PB7 (SDA) при `I2Cx_USE_PB8_PB9 0` |
-| **AF для I2C1** | AF4 (GPIOB) | AF4 (GPIOB) — совпадает |
-| **Инициализация I2C** | HAL STM32F2xx (другой API) | HAL STM32H7xx (регистр I2C_Timing) |
+| **MK** | STM32F207ZGT6 (Cortex-M3, 120 MHz) | STM32H743ZIT6 (Cortex-M7, 400 MHz) |
+| **I2C do CN7** | I2C1: **PB8 (SCL), PB9 (SDA)** | To samo z `I2Cx_USE_PB8_PB9 1` |
+| **Alternatywa (Morpo)** | — | PB6 (SCL), PB7 (SDA) z `I2Cx_USE_PB8_PB9 0` |
+| **AF dla I2C1** | AF4 (GPIOB) | AF4 (GPIOB) - mecze |
+| **Inicjalizacja I2C** | HAL STM32F2xx (inne API) | HAL STM32H7xx (rejestr I2C_Timing) |
 
-**Вывод:** Чтобы распайка совпадала с **NUCLEO-F207ZG** (разъём **CN7**), в step2 задать `#define I2Cx_USE_PB8_PB9 1` — тогда SCL = PB8 (D15), SDA = PB9 (D14) на CN7.
-
----
-
-## Текущая конфигурация
-
-- **Шина:** I2C1
-- **Пины:** PB6 = SCL, PB7 = SDA (AF4)
-- **Подтяжки:** внутренние GPIO_PULLUP включены (`I2Cx_GPIO_PULLUP 1` в `main.h`)
-- **Перед init:** выполняется сброс периферики I2C1 (на случай зависшей шины)
-- **Скорость:** Timing `0x10909CEC` (~100 kHz при 200 MHz APB1; при 100 MHz APB1 — ~50 kHz)
-- **Фильтры:** аналоговый включён, цифровой 0
+**Wyjście:** Aby okablowanie pokrywało się z **NUCLEO-F207ZG** (złącze **CN7**), w kroku 2 ustaw `#define I2Cx_USE_PB8_PB9 1` - następnie SCL = PB8 (D15), SDA = PB9 (D14) na CN7.
 
 ---
 
-## Варианты, которые можно менять
+## Bieżąca konfiguracja
 
-### 1. Подтяжки SDA/SCL
+- **Magistrala:** I2C1
+- **Piny:** PB6 = SCL, PB7 = SDA (AF4)
+- **Poprawki:** włączone wewnętrzne GPIO_PULLUP (`I2Cx_GPIO_PULLUP 1` w `main.h`)
+- **Przed inicjacją:** urządzenia peryferyjne I2C1 są resetowane (w przypadku zamrożenia magistrali)
+- **Prędkość:** Taktowanie `0x10909CEC` (~100 kHz przy 200 MHz APB1; przy 100 MHz APB1 — ~50 kHz)
+- **Filtry:** analogowe włączone, cyfrowe 0
 
-| Вариант | Где менять | Когда использовать |
+---
+
+## Opcje, które można zmienić
+
+### 1. Szelki SDA/SCL
+
+| Opcja | Gdzie zmienić | Kiedy używać |
 |--------|------------|---------------------|
-| **Внутренние подтяжки (сейчас)** | `main.h`: `#define I2Cx_GPIO_PULLUP 1` | Если на шине нет внешних резисторов (модуль без pull-up или длинные провода). |
-| **Без подтяжек** | `main.h`: `#define I2Cx_GPIO_PULLUP 0` | Если на модуле/шине уже есть резисторы 2.2–4.7 kΩ к 3.3 V. |
+| **Szelki wewnętrzne (teraz)** | `main.h`: `#define I2Cx_GPIO_PULLUP 1` | Jeżeli na magistrali nie ma rezystorów zewnętrznych (moduł bez podciągania i długich przewodów). |
+| **Brak szelek** | `main.h`: `#define I2Cx_GPIO_PULLUP 0` | Jeżeli moduł/szyna ma już rezystory od 2,2–4,7 kΩ do 3,3 V. |
 
-На многих LCD с PCF8574 уже стоят свои подтяжки — тогда можно попробовать `I2Cx_GPIO_PULLUP 0`. Если «No I2C device found» — вернуть 1.
+Wiele wyświetlaczy LCD z PCF8574 ma już własne podciągnięcia - wtedy możesz spróbować `I2Cx_GPIO_PULLUP 0`. Jeśli „Nie znaleziono urządzenia I2C” - zwróć 1.
 
-### 2. Пины I2C1 (альтернатива PB6/PB7)
+### 2. Piny I2C1 (alternatywa dla PB6/PB7)
 
-В `app/step2/Inc/main.h` переключатель **`I2Cx_USE_PB8_PB9`**:
+W przełączniku `app/step2/Inc/main.h` **`I2Cx_USE_PB8_PB9`**:
 
-| Значение | Пины | Использование |
+| Znaczenie | Szpilki | Użycie |
 |----------|------|----------------|
-| **0** (по умолчанию) | PB6 SCL, PB7 SDA | Morpho (на CN8 I2C по умолчанию не выведен). |
-| **1** | PB8 SCL, PB9 SDA | **CN7** (Zio): D15=PB8 SCL, D14=PB9 SDA — как на NUCLEO-F207ZG. |
+| **0** (domyślnie) | PB6 SCL, PB7 SDA | Morpho (w CN8 I2C nie jest domyślnie włączone). |
+| **1** | PB8 SCL, PB9 SDA | **CN7** (Zio): D15=PB8 SCL, D14=PB9 SDA - tak samo jak w NUCLEO-F207ZG. |
 
-Поменять вариант: в `main.h` поставить `#define I2Cx_USE_PB8_PB9 1` и пересобрать.
+Zmień opcję: wstaw `#define I2Cx_USE_PB8_PB9 1` w `main.h` i odbuduj.
 
-### 3. Сброс I2C перед инициализацией
+### 3. Zresetuj I2C przed inicjalizacją
 
-Сейчас в `MX_I2C1_Init()` перед настройкой делается:
+Teraz w `MX_I2C1_Init()` przed konfiguracją wykonywane są następujące czynności:
 `__HAL_RCC_I2C1_FORCE_RESET()` / `RELEASE_RESET()`.
 
-Это помогает, если после жёсткого сброса или зависания шина остаётся в некорректном состоянии. Если появятся странные сбои — можно временно убрать этот блок и проверить.
+Pomaga to, jeśli po twardym resecie lub zamarznięciu opona pozostaje w nieprawidłowym stanie. Jeśli pojawią się dziwne usterki, możesz tymczasowo usunąć tę blokadę i sprawdzić.
 
-### 4. Скорость (Timing)
+### 4. Prędkość (czas)
 
-- **Текущее значение:** `0x10909CEC` — стандартный режим (~100 kHz или ниже при 100 MHz APB1).
-- Для быстрого режима (400 kHz) нужно другое значение Timing (например, из CubeMX или [документации ST](https://www.st.com/resource/en/application_note/an4235-i2c-timing-configuration-tool-for-stm32-microcontrollers-stmicroelectronics.pdf)). Для сканера и PCF8574 лучше оставить 100 kHz.
+- **Bieżąca wartość:** `0x10909CEC` - tryb standardowy (~100 kHz lub mniej przy 100 MHz APB1).
+- W przypadku trybu szybkiego (400 kHz) potrzebujesz innej wartości taktowania (na przykład z CubeMX lub [dokumentacja ST](https://www.st.com/resource/en/application_note/an4235-i2c-timing-configuration-tool-for-stm32-microcontrollers-stmicroelectronics.pdf)). W przypadku skanera i PCF8574 lepiej pozostawić 100 kHz.
 
-### 5. Таймаут и количество попыток при скане
+### 5. Limit czasu i liczba prób skanowania
 
-В `do_i2c_scan()` используется:
-- `HAL_I2C_IsDeviceReady(..., 2, 50)` — 2 попытки, 50 ms таймаут.
+`do_i2c_scan()` używa:
+- `HAL_I2C_IsDeviceReady(..., 2, 50)` — 2 próby, timeout 50 ms.
 
-При медленной или зашумлённой шине можно увеличить: 3–5 попыток, 100 ms таймаут.
+Jeśli magistrala jest powolna lub hałaśliwa, możesz ją zwiększyć: 3–5 prób, limit czasu 100 ms.
 
-### 6. Проверка без устройств на шине
+### 6. Testowanie bez urządzeń na magistrali
 
-«No I2C device found» — нормально, если к PB6/PB7 ничего не подключено.  
-Если подключён модуль (например, LCD с PCF8574) и по-прежнему нет устройств:
+„Nie znaleziono urządzenia I2C” jest normalne, jeśli nic nie jest podłączone do PB6/PB7.
+Jeśli moduł jest podłączony (np. LCD z PCF8574) i nadal nie ma urządzeń:
 
-1. Проверить распайку: SCL → PB6, SDA → PB7, GND, VCC (3.3 V).
-2. Попробовать поменять SDA и SCL местами на стороне модуля.
-3. Включить внутренние подтяжки (`I2Cx_GPIO_PULLUP 1`).
-4. Убедиться, что питание модуля включено и контраст LCD настроен (синие полосы без текста часто означают питание без инициализации по I2C).
+1. Sprawdź okablowanie: SCL → PB6, SDA → PB7, GND, VCC (3,3 V).
+2. Spróbuj zamienić SDA i SCL po stronie modułu.
+3. Włącz wewnętrzne podciąganie (`I2Cx_GPIO_PULLUP 1`).
+4. Upewnij się, że moduł jest włączony i kontrast LCD jest ustawiony (niebieskie paski bez tekstu często oznaczają zasilanie bez inicjalizacji przez I2C).
 
 ---
 
-## Быстрая проверка
+## Szybkie sprawdzenie
 
-1. Собрать и прошить step2: `make step2 && make flash-step2`.
-2. Открыть UART 115200 — должны идти «Step 2: OK» и раз в 5 с блок «I2C scan…».
-3. Подключить LCD (GND, VCC, SDA→PB7, SCL→PB6), сброс платы — в логе должно появиться `[FOUND] 0x27` или `0x3F`.
+1. Zbuduj i flashuj krok 2: `zrób krok 2 i& wykonaj flash-krok 2`.
+2. Otwórz UART 115200 - Bloki „Krok 2: OK” i „Skanowanie I2C...” powinny pojawiać się co 5 sekund.
+3. Podłącz wyświetlacz LCD (GND, VCC, SDA → PB7, SCL → PB6), zresetuj płytkę - w logu powinien pojawić się komunikat `[FOUND] 0x27` lub `0x3F`.

@@ -1,12 +1,12 @@
 #!/bin/bash
-# Запуск GDB для отладки бутлоадера. Перед этим в другом терминале: st-util
-# После подключения: (gdb) break main  (gdb) continue
+# Uruchom GDB, aby debugować bootloader. Wcześniej w innym terminalu: st-util
+# Po połączeniu: (gdb) przerwa main (gdb) kontynuuj
 
 cd "$(dirname "$0")/.."
 ELF="${ELF:-build/bootloader/bootloader.elf}"
 
 if [ ! -f "$ELF" ]; then
-  echo "Соберите с отладочными символами: make -f bootloader/Makefile debug"
+echo „Kompiluj z symbolami debugowania: make -f bootloader/debugowanie pliku Makefile”
   exit 1
 fi
 

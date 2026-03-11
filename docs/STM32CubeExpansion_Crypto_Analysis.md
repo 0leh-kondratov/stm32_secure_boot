@@ -1,99 +1,99 @@
-# Анализ пакета STM32CubeExpansion_Crypto V4.6.0
+# Analiza pakietu STM32CubeExpansion_Crypto V4.6.0
 
-Пакет расположен по пути: `/data/projects/STM32CubeExpansion_Crypto_V4.6.0` (в запросе указан путь с опечаткой `...V4.6.0./` — лишняя точка в конце).
-
----
-
-## 1. Назначение
-
-**X-CUBE-CRYPTOLIB** — криптографическая прошивка (firmware) для всех серий STM32 от STMicroelectronics:
-
-- Алгоритмы проверены в рамках **NIST ACVP** (сертификация).
-- Поддержка **Cortex-M0/M0+, M3, M4, M7, M33, M55**.
-- Сборка под **GCC, ARM Compiler, IAR EWARM**.
+Pakiet znajduje się w ścieżce: `/data/projects/STM32CubeExpansion_Crypto_V4.6.0` (żądanie zawiera ścieżkę z literówką `...V4.6.0./` - dodatkowa kropka na końcu).
 
 ---
 
-## 2. Структура каталогов
+## 1. Cel
+
+**X-CUBE-CRYPTOLIB** - firmware kryptograficzny dla wszystkich serii STM32 firmy STMicroelectronics:
+
+- Algorytmy testowane są w ramach **NIST ACVP** (certyfikacja).
+- Obsługuje **Cortex-M0/M0+, M3, M4, M7, M33, M55**.
+- Kompilacja dla **GCC, kompilatora ARM, IAR EWARM**.
+
+---
+
+## 2. Struktura katalogów
 
 ```
 STM32CubeExpansion_Crypto_V4.6.0/
-├── Release_Notes.html      # История изменений пакета
+├── Release_Notes.html # Historia zmian pakietu
 ├── Package_license.html
 ├── sbom_cdx.json           # SBOM (CycloneDX v1.5)
-├── Drivers/                 # HAL, CMSIS, BSP по сериям (G0, G4, H5, H7, H7RS, L0–L5, N6, U0/U3/U5, WB, WBA, WL и др.)
+├── Sterowniki/ # HAL, CMSIS, BSP według serii (G0, G4, H5, H7, H7RS, L0–L5, N6, U0/U3/U5, WB, WBA, WL itp.)
 ├── Middlewares/
 │   └── ST/
-│       ├── STM32_Cryptographic/   # Основная крипто-библиотека (v4.0.5)
-│       ├── STM32_ExtMem_Loader/   # Загрузчик во внешнюю память
-│       └── STM32_ExtMem_Manager/  # Менеджер внешней памяти (NOR, PSRAM, SD и т.д.)
-└── Projects/               # Примеры по платам (NUCLEO-*, P-NUCLEO-WB55)
+│ ├── STM32_Cryptographic/ # Główna biblioteka kryptograficzna (v4.0.5)
+│ ├── STM32_ExtMem_Loader/ # Program ładujący do pamięci zewnętrznej
+│ └── STM32_ExtMem_Manager/ # Menedżer pamięci zewnętrznej (NOR, PSRAM, SD itp.)
+└── Projekty/ # Przykłady na tablicach (NUCLEO-*, P-NUCLEO-WB55)
 ```
 
 ---
 
-## 3. Криптографическая библиотека (STM32_Cryptographic)
+## 3. Biblioteka kryptograficzna (STM32_Cryptographic)
 
-### 3.1 Реализация
+### 3.1 Wdrożenie
 
-- **Библиотеки** — прекомпилированные `.a` в `Middlewares/ST/STM32_Cryptographic/lib/`:
+- **Biblioteki** - prekompilowane `.a` w `Middlewares/ST/STM32_Cryptographic/lib/`:
   - `libSTM32Cryptographic_CM0_CM0PLUS.a`
   - `libSTM32Cryptographic_CM3.a`
   - `libSTM32Cryptographic_CM4.a`
-  - `libSTM32Cryptographic_CM7.a`   ← **для STM32H743 (Cortex-M7)**
+- `libSTM32Cryptographic_CM7.a` ← **dla STM32H743 (Cortex-M7)**
   - `libSTM32Cryptographic_CM33.a`
-  - `libSTM32Cryptographic_CM55.a`  (в т.ч. для STM32N6)
-- Исходников алгоритмов в пакете нет — только заголовки и **legacy_v3** (обёртки старого API).
+- `libSTM32Cryptographic_CM55.a` (w tym dla STM32N6)
+- W pakiecie nie ma kodów źródłowych algorytmów - jedynie nagłówki i **legacy_v3** (opakowania starego API).
 
 ### 3.2 API (CMOX — Cortex-M Optimized)
 
-Единая точка входа по заголовкам: `#include "cmox_crypto.h"` (подтягивает все модули).
+Pojedynczy punkt wejścia dla nagłówków: `#include "cmox_crypto.h"` (pobiera wszystkie moduły).
 
-| Модуль   | Заголовки / алгоритмы |
+| Moduł | Nagłówki/algorytmy |
 |----------|------------------------|
 | **Cipher** | AES (CBC, CCM, CFB, CTR, ECB, GCM, OFB, XTS, Keywrap), SM4, ChaCha20-Poly1305 |
 | **Hash** | SHA-1, SHA-224/256/384/512, SHA-3, SM3, SHAKE |
 | **MAC**  | CMAC, HMAC, KMAC |
 | **RSA**  | PKCS#1 v1.5, PKCS#1 v2.2 (Encrypt/Decrypt, Sign/Verify) |
 | **ECC**  | ECDSA, EdDSA, SM2, ECDH |
-| **DRBG** | CTR_DRBG (генерация случайных чисел) |
-| **Utils**| Сравнение (constant-time и др.) |
+| **DRBG** | CTR_DRBG (generowanie liczb losowych) |
+| **Narzędzia**| Porównanie (czas stały itp.) |
 
-Конфигурация по умолчанию: `cmox_default_config.h`. Варианты «быстрая/малая» реализация AES: `cmox_fast_config.h`, `cmox_small_config.h`.
+Domyślna konfiguracja: `cmox_default_config.h`. Opcje dla „szybkiej/małej” implementacji AES: `cmox_fast_config.h`, `cmox_small_config.h`.
 
-### 3.3 Инициализация и низкоуровневый слой
+### 3.3 Inicjalizacja i warstwa niskiego poziomu
 
-- В начале работы приложения:
-  - `cmox_initialize(&init_target)` — с `cmox_init_arg_t` (например `CMOX_INIT_TARGET_AUTO` или явно `CMOX_INIT_TARGET_H7`).
-  - Внутри вызывается **cmox_ll_init()** из файла `interface/cmox_low_level_template.c`.
-- В шаблоне:
-  - Включается тактирование **CRC** (`__HAL_RCC_CRC_CLK_ENABLE()` и т.п.) — нужно для крипто-операций.
-  - Файл нужно включить в проект и при необходимости раскомментировать `#include "stm32h7xx_hal.h"` (или своей серии).
-- По окончании работы с крипто:
+- Na początku aplikacji:
+- `cmox_initialize(&init_target)` - z `cmox_init_arg_t` (na przykład `CMOX_INIT_TARGET_AUTO` lub jawnie `CMOX_INIT_TARGET_H7`).
+- Wewnętrznie **cmox_ll_init()** jest wywoływana z pliku `interface/cmox_low_level_template.c`.
+- W szablonie:
+- Włączone jest taktowanie **CRC** (`__HAL_RCC_CRC_CLK_ENABLE()`, itp.) - potrzebne do operacji kryptograficznych.
+- Plik musi być dołączony do projektu iw razie potrzeby odkomentowany `#include "stm32h7xx_hal.h"` (lub Twoja seria).
+- Po zakończeniu pracy z kryptowalutami:
   - `cmox_finalize(NULL)`.
 
-Без реализации `cmox_ll_init`/`cmox_ll_deInit` (и линковки `cmox_low_level_template.c`) библиотека не будет корректно инициализирована.
+Bez zaimplementowania `cmox_ll_init`/`cmox_ll_deInit` (i połączenia `cmox_low_level_template.c`) biblioteka nie zostanie poprawnie zainicjalizowana.
 
 ---
 
-## 4. Пример использования (одношаговый и потоковый)
+## 4. Przykład użycia (one-step i streaming)
 
-Из примера **AES_CBC_EncryptDecrypt** (NUCLEO-H753ZI):
+Z przykładu **AES_CBC_EncryptDecrypt** (NUCLEO-H753ZI):
 
 ```c
 #include "cmox_crypto.h"
 
 cmox_init_arg_t init_target = { CMOX_INIT_TARGET_AUTO, NULL };
 
-// 1) Инициализация
+// 1) Inicjalizacja
 if (cmox_initialize(&init_target) != CMOX_INIT_SUCCESS) { ... }
 
-// 2) Одношаговое шифрование
+// 2) Szyfrowanie jednoetapowe
 retval = cmox_cipher_encrypt(CMOX_AES_CBC_ENC_ALGO,
     Plaintext, sizeof(Plaintext), Key, sizeof(Key), IV, sizeof(IV),
     Computed_Ciphertext, &computed_size);
 
-// 3) Или потоковый режим: construct → init → setKey → setIV → append (по кускам) → cleanup
+// 3) Lub tryb strumieniowy: konstrukcja → init → setKey → setIV → dołączanie (kawałek po kawałku) → czyszczenie
 cipher_ctx = cmox_cbc_construct(&Cbc_Ctx, CMOX_AES_CBC_ENC);
 cmox_cipher_init(cipher_ctx);
 cmox_cipher_setKey(cipher_ctx, Key, sizeof(Key));
@@ -101,17 +101,17 @@ cmox_cipher_setIV(cipher_ctx, IV, sizeof(IV));
 cmox_cipher_append(cipher_ctx, chunk, size, out, &out_len);
 cmox_cipher_cleanup(cipher_ctx);
 
-// 4) Завершение
+// 4) Zakończenie
 cmox_finalize(NULL);
 ```
 
-Аналогично для AEAD (GCM, CCM, ChaCha20-Poly1305), хешей, MAC, RSA, ECC, DRBG — через соответствующие заголовки и типы (cmox_*_handle_t, cmox_*_construct, cmox_*_encrypt/decrypt и т.д.).
+Podobnie dla AEAD (GCM, CCM, ChaCha20-Poly1305), skrótów, MAC, RSA, ECC, DRBG - poprzez odpowiednie nagłówki i typy (cmox_*_handle_t, cmox_*_construct, cmox_*_encrypt/decrypt itp.).
 
 ---
 
-## 5. Проекты-примеры (Projects)
+## 5. Przykładowe projekty (Projekty)
 
-По одной плате на серию, внутри — приложения по категориям:
+Jedna tablica na serię, wewnątrz - zastosowania według kategorii:
 
 - **Cipher**: AES_CBC, AES_GCM_AEAD, ChaCha20-Poly1305_AEAD, SM4_CTR
 - **Hash**: SHA2_Digest, SHA3_Digest, SM3_Digest, SHAKE_Digest
@@ -120,58 +120,58 @@ cmox_finalize(NULL);
 - **ECC**: ECDSA_SignVerify, ECDH_SharedSecretGeneration, EdDSA_SignVerify, SM2_SignVerify
 - **DRBG**: RandomGeneration
 
-Для **STM32H7** (в т.ч. H743) релевантен каталог **NUCLEO-H753ZI** (тот же Cortex-M7, та же библиотека `libSTM32Cryptographic_CM7.a`). Сборки: **STM32CubeIDE**, **EWARM**, **MDK-ARM** (для части примеров — с FSBL для XIP).
+Dla **STM32H7** (w tym H743) odpowiedni jest katalog **NUCLEO-H753ZI** (ten sam Cortex-M7, ta sama biblioteka `libSTM32Cryptographic_CM7.a`). Zespoły: **STM32CubeIDE**, **EWARM**, **MDK-ARM** (dla niektórych przykładów - z FSBL dla XIP).
 
 ---
 
 ## 6. Legacy API (v3)
 
-В `legacy_v3/` лежат обёртки старого API (исходники в C) поверх CMOX для обратной совместимости: например `legacy_v3_aes_cbc.c`, `legacy_v3_hmac_sha256.c`, `legacy_v3_ecc.c` и т.д. Для нового кода предпочтительно использовать прямой CMOX API.
+`legacy_v3/` zawiera opakowania starego API (źródła w C) na wierzchu CMOX dla kompatybilności wstecznej: na przykład `legacy_v3_aes_cbc.c`, `legacy_v3_hmac_sha256.c`, `legacy_v3_ecc.c` itp. W przypadku nowego kodu lepiej jest użyć bezpośredniego API CMOX.
 
 ---
 
-## 7. Интеграция в проект (например, stm32_secure_boot)
+## 7. Integracja z projektem (na przykład stm32_secure_boot)
 
-Чтобы использовать криптобиблиотеку в своём проекте (например, для проверки подписи образа при secure boot):
+Aby użyć biblioteki kryptograficznej w swoim projekcie (na przykład w celu sprawdzenia podpisu obrazu podczas bezpiecznego rozruchu):
 
-1. **Подключить пакет**  
-   Указать корень пакета (например `Crypto_ROOT = /data/projects/STM32CubeExpansion_Crypto_V4.6.0`).
+1. **Pakiet Connect**
+Określ katalog główny pakietu (na przykład `Crypto_ROOT = /data/projects/STM32CubeExpansion_Crypto_V4.6.0`).
 
-2. **Добавить в сборку**  
-   - Библиотека: `Middlewares/ST/STM32_Cryptographic/lib/libSTM32Cryptographic_CM7.a` (для H743).  
-   - Исходник низкоуровневого слоя: `Middlewares/ST/STM32_Cryptographic/interface/cmox_low_level_template.c`.  
-   - В `cmox_low_level_template.c` включить свой HAL (например `stm32h7xx_hal.h`) и при необходимости поправить макросы RCC для CRC под свою плату.
+2. **Dodaj do kompilacji**
+- Biblioteka: `Middlewares/ST/STM32_Cryptographic/lib/libSTM32Cryptographic_CM7.a` (dla H743).
+- Źródło warstwy niskiego poziomu: `Middlewares/ST/STM32_Cryptographic/interface/cmox_low_level_template.c`.
+- W `cmox_low_level_template.c` dołącz HAL (na przykład `stm32h7xx_hal.h`) i, jeśli to konieczne, popraw makra RCC dla CRC swojej płyty.
 
-3. **Подключить заголовки**  
+3. **Połącz nagłówki**
    - `Middlewares/ST/STM32_Cryptographic/include`  
    - `Middlewares/ST/STM32_Cryptographic/interface`  
-   Включать в коде `#include "cmox_crypto.h"`.
+Dołącz `#include "cmox_crypto.h"` do kodu.
 
-4. **Инициализация**  
-   Вызвать `cmox_initialize()` после HAL (и при необходимости после настройки тактирования/CRC), по окончании — `cmox_finalize()`.
+4. **Inicjalizacja**
+Wywołaj `cmox_initialize()` po HAL (i jeśli to konieczne po ustawieniu zegara/CRC), a po zakończeniu wywołaj `cmox_finalize()`.
 
-5. **Выбор алгоритмов**  
-   Для проверки подписи образа обычно нужны: **Hash** (SHA-256 и т.п.) и **RSA** (PKCS#1 v1.5 или v2.2) или **ECC** (ECDSA). Примеры в Projects показывают полный цикл (ключ, подпись, верификация).
+5. **Wybór algorytmów**
+Aby zweryfikować podpis obrazu, zwykle potrzebujesz: **Hash** (SHA-256 itp.) i **RSA** (PKCS#1 v1.5 lub v2.2) lub **ECC** (ECDSA). Przykłady w Projektach pokazują pełny cykl (klucz, podpis, weryfikacja).
 
 ---
 
-## 8. Полезные ссылки (из Release_Notes)
+## 8. Przydatne linki (z Release_Notes)
 
 - **DB2660** — Databrief STM32 Cryptographic library for STM32Cube.
-- **Wiki**: [Category: Cryptographic library](https://wiki.st.com/stm32mcu/wiki/Category:Cryptographic_library) — обзор, безопасное использование, производительность, сертификация, миграция.
-- **NIST ACVP** — ссылки на отчёты валидации по библиотекам указаны в Release Notes middleware’а (`Middlewares/ST/STM32_Cryptographic/Release_Notes.html`).
+- **Wiki**: [Kategoria: Biblioteka kryptograficzna](https://wiki.st.com/stm32mcu/wiki/Category:Cryptographic_library) - przegląd, bezpieczne użytkowanie, wydajność, certyfikacja, migracja.
+- **NIST ACVP** - łącza do raportów walidacyjnych dla bibliotek podano w uwagach do wydania oprogramowania pośredniego (`Middlewares/ST/STM32_Cryptographic/Release_Notes.html`).
 
 ---
 
-## 9. Краткое резюме
+## 9. Krótkie podsumowanie
 
-| Элемент | Описание |
+| Element | Opis |
 |--------|----------|
-| **Версия пакета** | V4.6.0 (12-Sep-2025), крипто-middleware v4.0.5 |
-| **Библиотеки** | Прекомпилированные `.a` под каждое ядро (CM0/CM3/CM4/CM7/CM33/CM55) |
-| **API** | CMOX (Cortex-M Optimized); опционально legacy_v3 |
-| **Инициализация** | `cmox_initialize()` + реализация `cmox_ll_init()` в `cmox_low_level_template.c` (включить CRC) |
-| **Для STM32H743** | Использовать `libSTM32Cryptographic_CM7.a` и примеры NUCLEO-H753ZI |
-| **Документация** | Release_Notes.html в корне и в `Middlewares/ST/STM32_Cryptographic/`, Wiki ST |
+| **Wersja pakietu** | V4.6.0 (12 września 2025 r.), oprogramowanie pośredniczące do kryptowalut v 4.0.5 |
+| **Biblioteki** | Prekompilowany plik „.a” dla każdego rdzenia (CM0/CM3/CM4/CM7/CM33/CM55) |
+| **API** | CMOX (zoptymalizowany dla Cortex-M); opcjonalne starsze_v3 |
+| **Inicjalizacja** | `cmox_initialize()` + implementacja `cmox_ll_init()` w `cmox_low_level_template.c` (włącz CRC) |
+| **Dla STM32H743** | Użyj przykładów `libSTM32Cryptographic_CM7.a` i NUCLEO-H753ZI |
+| **Dokumentacja** | Release_Notes.html w katalogu głównym oraz w `Middlewares/ST/STM32_Cryptographic/`, Wiki ST |
 
-Этот пакет можно использовать в проекте secure boot для проверки подписей (RSA/ECDSA) и хешей (SHA-256 и др.) при загрузке прошивки.
+Tego pakietu można użyć w projekcie bezpiecznego rozruchu w celu weryfikacji podpisów (RSA/ECDSA) i skrótów (SHA-256 itp.) podczas ładowania oprogramowania sprzętowego.

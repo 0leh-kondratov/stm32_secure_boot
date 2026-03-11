@@ -1,34 +1,147 @@
-# STM32H743 Secure Bootloader (NUCLEO-144)
+# STM32 Secure Boot + FreeRTOS/LwIP (NUCLEO-H743ZI2)
 
-Защищённый загрузчик с проверкой ECDSA P-256 подписи прошивки.
+Repozytorium zawiera zestaw firmware'ow edukacyjnych i testowych dla STM32H743:
+- secure bootloader,
+- kilka etapow aplikacji (`step1`, `step2`),
+- profile sieciowe z FreeRTOS + LwIP (`lwip`, `lwip_zero`),
+- scenariusze testow i debugowania.
 
-**Подробная инструкция по сборке и прошивке:** [docs/BUILD_RU.md](docs/BUILD_RU.md)
+Projekt jest nastawiony na praktyczne uruchamianie na plytce **NUCLEO-H743ZI2** oraz szybka diagnostyke przez UART/GDB.
 
-**Verified Boot на STM32 (терминология и концепции):** [docs/VERIFIED_BOOT_STM32_RU.md](docs/VERIFIED_BOOT_STM32_RU.md)
+---
 
-**Использование примеров для тестирования:** [docs/TESTING_RU.md](docs/TESTING_RU.md)
+## Co znajdziesz w repo
 
-**Интерактивная отладка (GDB + st-util):** [docs/DEBUG_RU.md](docs/DEBUG_RU.md)
+- `bootloader/` - secure boot (weryfikacja obrazu aplikacji przed startem).
+- `app/step1/` - prosty profil testowy: LED + UART.
+- `app/step2/` - FreeRTOS + logger + I2C scanner.
+- `app/lwip/` - starszy profil LwIP.
+- `app/lwip_zero/` - aktualny profil "od zera": FreeRTOS + LwIP + Netconn HTTP + logi UART.
+- `common/` - wspolne moduly, m.in. logger UART.
+- `docs/` - dokumentacja techniczna i notatki uruchomieniowe.
+- `scripts/` - flashowanie, debug, testy portu UART.
 
-**Эмуляция в Renode (без платы):** [docs/SIMULATE_RU.md](docs/SIMULATE_RU.md)
+---
 
-**Что нужно для создания/прошивки образа под STM32 (наш проект и официальные ST):** [docs/WHAT_NEEDED_STM32_RU.md](docs/WHAT_NEEDED_STM32_RU.md)
+## Wymagania
 
-**Быстрый старт X-CUBE-SBSFU (скачать и запустить на STM32):** [docs/SBSFU_QUICKSTART_RU.md](docs/SBSFU_QUICKSTART_RU.md)
+- Linux + `bash`
+- toolchain ARM:
+  - `arm-none-eabi-gcc`
+  - `arm-none-eabi-gdb`
+- narzedzia ST-Link:
+  - `st-flash`
+  - `st-util`
+  - `st-info`
+- narzedzia pomocnicze:
+  - `make`
+  - `python3`
+  - `minicom` (lub alternatywny terminal szeregowy)
 
-Быстрый старт:
+Przyklad instalacji (Ubuntu):
+
 ```bash
-make
-make -f app/Makefile all
-source scripts/venv/bin/activate && python scripts/sign_image.py build/app/app.bin build/app/signed_app.bin
-st-flash write build/bootloader/bootloader.bin 0x08000000
-st-flash write build/app/signed_app.bin 0x08010000
+sudo apt update
+sudo apt install -y gcc-arm-none-eabi gdb-multiarch stlink-tools make python3 minicom
 ```
 
---- СКОПИРУЙ ЭТО В СВОЙ C-КОД (bootloader/inc/keys.h) ---
-const uint8_t root_public_key[] = {
-    0x34, 0x86, 0x01, 0xda, 0x15, 0xea, 0x37, 0x48, 0xec, 0x40, 0x9c, 0xbd, 0x76, 0xc2, 0x98, 0x09, 0x29, 0x51, 0xec, 0xed, 0xcf, 0x66, 0xa4, 0x56, 0x41, 0x4e, 0xe0, 0x6a, 0x92, 0xf9, 0xf3, 0x3e, 0x8d, 0xc2, 0xd0, 0xed, 0x77, 0x55, 0x09, 0xfa, 0xa9, 0x92, 0x6f, 0xfa, 0x13, 0xac, 0xfe, 0x7c, 0x2e, 0x4b, 0x28, 0xb5, 0xc2, 0xdb, 0xda, 0xa4, 0x1d, 0x05, 0xcf, 0x41, 0x2e, 0x9a, 0x48, 0x42
-};
----------------------------------------------------------
+---
 
-https://github.com/3mdeb/verified-boot
+## Szybki start (najczesciej uzywany: `lwip_zero`)
+
+1) Budowanie:
+
+```bash
+make lwip-zero
+```
+
+2) Flash:
+
+```bash
+make flash-lwip-zero
+```
+
+3) UART log (zwykle `ttyACM1`, ale sprawdz `dmesg`):
+
+```bash
+minicom -D /dev/ttyACM1 -b 115200
+```
+
+4) Debug GDB (w osobnych terminalach):
+
+```bash
+st-util
+bash scripts/gdb_lwip_zero.sh
+```
+
+---
+
+## Najwazniejsze targety `make`
+
+- `make` - domyslnie buduje `bootloader`.
+- `make lwip-zero` - budowa firmware `build/lwip_zero/lwip_zero.bin`.
+- `make flash-lwip-zero` - flash `lwip_zero` pod `0x08000000`.
+- `make lwip` / `make flash-lwip` - starszy profil LwIP.
+- `make step1` / `make flash-step1` - etap 1 (LED/UART).
+- `make step2` / `make flash-step2` - etap 2 (FreeRTOS + I2C).
+- `make demo` / `make flash-demo` - profil demo.
+- `make clean` - czyszczenie artefaktow build.
+
+---
+
+## Secure boot - stan i workflow
+
+- Bootloader jest budowany z `bootloader/Makefile`.
+- Aplikacja moze byc podpisana skryptem `scripts/sign_image.py`.
+- Dostepny jest flow "signed app" z poziomu glownego `Makefile`.
+
+Przykladowy przebieg:
+
+```bash
+make bootloader
+make app
+make signed-app
+```
+
+Uwaga: ustawienia produkcyjne (RDP/WRP/PCROP, blokada debug) nalezy wlaczac dopiero po pelnej walidacji procesu aktualizacji.
+
+---
+
+## Diagnostyka i typowe problemy
+
+- ST-Link zajety:
+  - Objaw: `st-flash` nie moze polaczyc sie z targetem.
+  - Rozwiazanie: zatrzymaj `st-util` przed flashowaniem.
+
+- Brak logow UART:
+  - Sprawdz poprawny port (`/dev/ttyACM0` vs `/dev/ttyACM1`).
+  - Ustaw `115200 8N1`.
+
+- HardFault po starcie:
+  - Uzyj `scripts/gdb_lwip_zero.sh` - skrypt wypisuje rejestry, CFSR/HFSR/BFAR i stos.
+
+- Brak STM32CubeH7:
+  - Niektore targety korzystaja z `CUBE_ROOT`.
+  - Mozna nadpisac sciezke:
+
+```bash
+make demo CUBE_ROOT=/sciezka/do/STM32CubeH7
+```
+
+---
+
+## Dalsza dokumentacja
+
+- `docs/ARCHITECTURE.md` - mapa architektury projektu.
+- `docs/LWIP_ANALYSIS_PL.md` - opis profilu `lwip_zero`.
+- `docs/DEBUG_PL.md` - wskazowki debugowania.
+- `docs/VERIFIED_BOOT_STM32_PL.md` - notatki o verified boot na STM32.
+
+---
+
+## Status projektu
+
+Projekt ma charakter badawczo-edukacyjny. Kod i konfiguracje sa intensywnie iterowane pod konkretna plytke, dlatego przed uzyciem produkcyjnym konieczne sa:
+- audyt bezpieczenstwa,
+- testy dlugoczasowe,
+- walidacja konfiguracji Option Bytes.

@@ -1,10 +1,10 @@
 /*
- * Demo with FreeRTOS: переключение LED1 → LED2 → LED3 → по кругу, 1 раз в 1 с.
- * Без приглашения и команд — только цикл и одна строка в UART при старте.
- * NUCLEO-H743ZI2 (MB1364): LED1=PB0, LED2=PE1, LED3=PB14 (управляет демо).
- * LD4 (ST-Link, не управляется МК):
- *   Красный  — связь с ПК есть, программатор ещё не задействован (нет прошивки/отладки в IDE).
- *   Зелёный  — прошивка успешно завершена или сессия отладки активна (ожидание).
+* Demo z FreeRTOS: przełączanie LED1 → LED2 → LED3 → w kółko, 1 raz na 1 s.
+* Żadnych podpowiedzi ani poleceń - tylko pętla i jedna linia w UART przy uruchomieniu.
+* NUCLEO-H743ZI2 (MB1364): LED1=PB0, LED2=PE1, LED3=PB14 (demo sterowania).
+* LD4 (ST-Link, nie kontrolowany przez MK):
+* Czerwony - istnieje połączenie z komputerem, programator nie jest jeszcze aktywowany (brak oprogramowania/debugowania w IDE).
+* Zielony - oprogramowanie układowe zostało pomyślnie ukończone lub sesja debugowania jest aktywna (oczekiwanie).
  */
 #include <stdint.h>
 #include <string.h>
@@ -76,9 +76,9 @@ static void led3_set(int on)
     else    GPIOB_BSRR = (1U << LED3_PIN);
 }
 
-/* Медленный цикл: LED1 → LED2 → LED3 → LED1 … (один горит, остальные погашены) */
+/* Wolny cykl: LED1 → LED2 → LED3 → LED1 ... (jedna świeci, pozostałe są wyłączone) */
 #ifdef DEMO_RENODE_AUTO_CMD
-/* В Renode SysTick часто не тикает — vTaskDelay не возвращается. Busy-wait ~1 c при 64 MHz. */
+/* W Renode SysTick często się nie zaznacza – vTaskDelay nie zwraca. Zajęty-czekaj ~1 s przy 64 MHz. */
 static void delay_approx_1s(void)
 {
     for (volatile uint32_t i = 0; i < 16000000UL; i++) { (void)i; }
@@ -101,7 +101,7 @@ static void task_led_cycle(void *pv)
             led3_set(led3_override);
         else
             led3_set(cur == 2);
-        /* Отладка: какой LED горит (L1/L2/L3) */
+/* Debugowanie: która dioda LED się świeci (L1/L2/L3) */
         if (cur == 0) log_puts("[LED] LED1 on\r\n");
         else if (cur == 1) log_puts("[LED] LED2 on\r\n");
         else log_puts("[LED] LED3 on\r\n");
@@ -123,7 +123,7 @@ static int str_prefix(const char *line, const char *cmd)
     return 0;
 }
 
-/* После префикса "ledX" пропустить пробелы и проверить "on"/"off". Возвращает 1=on, 0=off, -1=нет. */
+/* Po przedrostku „ledX” pomiń spacje i sprawdź, czy nie ma „włączonych”/„wyłączonych”. Zwraca 1=wł., 0=wył., -1=nie. */
 static int led_arg(const char *p)
 {
     while (*p == ' ' || *p == '\t') p++;
@@ -134,7 +134,7 @@ static int led_arg(const char *p)
     if (str_prefix(p, "on"))  return 1;
     if (str_prefix(p, "off")) return 0;
 #ifdef DEMO_RENODE_AUTO_CMD
-    if (*p == 'n' || *p == 'o') return 1; /* on → "n"/"o" при потере каждого 2-го символа */
+if (*p == 'n' || *p == 'o') zwróć 1; /* on → „n”/„o”, gdy co drugi znak zostanie utracony */
     if (*p == 'f') return 0;
 #endif
     return -1;
@@ -215,7 +215,7 @@ static void run_cmd(char *line)
 }
 
 #ifdef DEMO_RENODE_AUTO_CMD
-/* В Renode: раз в 5 с выводим status (цикл LED уже крутится в task_led_cycle). */
+/* W Renode: stan wyjścia co 5 sekund (cykl LED już się obraca w cyklu_zadania). */
 static void task_auto_cmd(void *pv)
 {
     (void)pv;
@@ -253,7 +253,7 @@ static void task_shell(void *pv)
             }
         }
 #ifdef DEMO_RENODE_AUTO_CMD
-        /* В Renode \r/\n часто теряются (UART #487). Отправка по таймауту: пауза ~400 мс = ввод команды завершён */
+/* W Renode \r/\n są często tracone (UART #487). Wysyłanie po przekroczeniu limitu czasu: pauza ~400 ms = wprowadzanie polecenia zakończone */
         if (len > 0 && (xTaskGetTickCount() - last_char) >= pdMS_TO_TICKS(SHELL_IDLE_MS)) {
             buf[len] = '\0';
             log_puts("\r\n");
@@ -274,7 +274,7 @@ extern void SystemCoreClockUpdate(void);
 
 int main(void)
 {
-    /* Ранний UART и сразу LED — видно, что дошли до main, даже если дальше зависаем */
+/* Wczesny UART i od razu LED - jasne, że doszliśmy do głównego, nawet jeśli dalej zamarzamy */
     log_init();
     leds_init();
     led1_set(1);
@@ -293,7 +293,7 @@ int main(void)
 
     BaseType_t cr;
 #ifdef DEMO_RENODE_AUTO_CMD
-    /* Renode: статический стек и TCB в .bss — обходим зависание xTaskCreate (pvPortMalloc/куча в эмуляторе) */
+/* Renode: stos statyczny i TCB w .bss - ominięcie rozłączenia xTaskCreate (pvPortMalloc/sterta w emulatorze) */
     static StackType_t led_stack[configMINIMAL_STACK_SIZE * 4];
     static StaticTask_t led_tcb;
     log_puts("[DBG] before xTaskCreateStatic\r\n");
